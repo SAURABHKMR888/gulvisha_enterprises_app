@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getAuthHeaders, useAuth } from './auth'
+import { getAuthHeaders } from './auth'
 
 type UserRow = {
   id: string
@@ -26,7 +26,6 @@ function statusBadge(status: string): string {
 }
 
 export default function UsersPage() {
-  const { logout } = useAuth()
   const [users, setUsers] = useState<UserRow[]>([])
   const [loaded, setLoaded] = useState(false)
   const [message, setMessage] = useState('')
@@ -109,7 +108,7 @@ export default function UsersPage() {
         </div>
         <div className="portal-header-actions">
           <a className="button button-ghost" href="/admin">← Dashboard</a>
-          <button className="button button-primary" type="button" onClick={logout}>Sign out</button>
+          
         </div>
       </header>
 
@@ -190,3 +189,4 @@ export default function UsersPage() {
     </div>
   )
 }
+

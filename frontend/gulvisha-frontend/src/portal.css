@@ -27,3 +27,135 @@
 @media (max-width: 640px) {
   .portal-header { flex-direction: column; align-items: flex-start; }
 }
+
+/* ---------- Admin Shell with Sidebar ---------- */
+.admin-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.admin-sidebar {
+  width: 240px;
+  background: #1a1d23;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 100;
+}
+
+.admin-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e0e0e0;
+}
+
+.admin-sidebar-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #4f8cff;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+
+.admin-sidebar-brand strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.admin-sidebar-brand small {
+  font-size: 0.72rem;
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.admin-sidebar-nav {
+  flex: 1;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  color: #e0e0e0;
+  text-decoration: none;
+  font-size: 0.9rem;
+  opacity: 0.65;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.admin-sidebar-link:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.admin-sidebar-link.active {
+  opacity: 1;
+  background: rgba(79, 140, 255, 0.15);
+  color: #4f8cff;
+}
+
+.admin-sidebar-icon {
+  font-size: 1.1rem;
+  width: 20px;
+  text-align: center;
+}
+
+.admin-sidebar-footer {
+  padding: 14px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-sidebar-user {
+  font-size: 0.82rem;
+  opacity: 0.7;
+}
+
+.admin-content {
+  flex: 1;
+  margin-left: 240px;
+  padding: 32px 36px 60px;
+  max-width: 1200px;
+}
+
+.button-small {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 768px) {
+  .admin-sidebar {
+    width: 60px;
+  }
+  .admin-sidebar-brand strong,
+  .admin-sidebar-brand small,
+  .admin-sidebar-link,
+  .admin-sidebar-footer {
+    display: none;
+  }
+  .admin-content {
+    margin-left: 60px;
+    padding: 20px 16px;
+  }
+}

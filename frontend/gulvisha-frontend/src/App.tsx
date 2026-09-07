@@ -6,6 +6,9 @@ import PortalPage from './portal'
 import SettingsPage from './settings'
 import UsersPage from './users'
 import SitePage from './sitePages'
+import WorkflowsPage from './workflows'
+import AiPage from './ai'
+import AdminLayout from './admin-layout'
 
 type HealthResponse = {
   status: string
@@ -326,7 +329,7 @@ function RequireRole({ clientOnly, children }: { clientOnly?: boolean; children:
 }
 
 function AdminRoute() {
-  return <RequireRole><AdminPage /></RequireRole>
+  return <RequireRole><AdminLayout currentPath="/admin"><AdminPage /></AdminLayout></RequireRole>
 }
 
 function PortalRoute() {
@@ -334,19 +337,29 @@ function PortalRoute() {
 }
 
 function SettingsRoute() {
-  return <RequireRole><SettingsPage /></RequireRole>
+  return <RequireRole><AdminLayout currentPath="/settings"><SettingsPage /></AdminLayout></RequireRole>
 }
 
 function UsersRoute() {
-  return <RequireRole><UsersPage /></RequireRole>
+  return <RequireRole><AdminLayout currentPath="/users"><UsersPage /></AdminLayout></RequireRole>
+}
+
+function WorkflowsRoute() {
+  return <RequireRole><AdminLayout currentPath="/workflows"><WorkflowsPage /></AdminLayout></RequireRole>
+}
+
+function AiRoute() {
+  return <RequireRole><AdminLayout currentPath="/ai"><AiPage /></AdminLayout></RequireRole>
 }
 
 function AppRouter() {
-  const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/'
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/' 
   if (currentPath === '/admin') return <AdminRoute />
   if (currentPath === '/portal') return <PortalRoute />
   if (currentPath === '/settings') return <SettingsRoute />
   if (currentPath === '/users') return <UsersRoute />
+    if (currentPath === '/workflows') return <WorkflowsRoute />
+  if (currentPath === '/ai') return <AiRoute />
   if (currentPath === '/login') return <LoginPage />
   return <PublicSite />
 }

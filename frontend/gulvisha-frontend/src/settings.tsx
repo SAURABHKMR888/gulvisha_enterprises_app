@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getAuthHeaders, useAuth } from './auth'
+import { getAuthHeaders } from './auth'
 
 type Org = {
   id: string; name: string; description: string | null; industry: string | null
@@ -33,7 +33,6 @@ function json<T>(response: Response | Promise<Response>): Promise<T> {
 }
 
 export default function SettingsPage() {
-  const { logout } = useAuth()
   const [tab, setTab] = useState<TabKey>('organization')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -161,7 +160,7 @@ export default function SettingsPage() {
         <div className="portal-header-actions">
           <a className="button button-ghost" href="/admin">← Dashboard</a>
           <a className="button button-ghost" href="/">Website</a>
-          <button className="button button-primary" type="button" onClick={logout}>Sign out</button>
+          
         </div>
       </header>
 
@@ -292,3 +291,4 @@ export default function SettingsPage() {
     </div>
   )
 }
+

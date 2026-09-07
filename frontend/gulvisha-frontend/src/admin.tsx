@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getAuthHeaders, useAuth } from './auth'
+import { getAuthHeaders } from './auth'
 
 type DashboardSummary = {
   totalEnquiries: number
@@ -55,7 +55,6 @@ function readPreference(key: string, fallback: string): string {
 }
 
 export default function AdminPage() {
-  const { logout } = useAuth()
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [enquiries, setEnquiries] = useState<AdminEnquiry[]>([])
   const [totalEnquiries, setTotalEnquiries] = useState(0)
@@ -266,7 +265,7 @@ export default function AdminPage() {
   const sortedEnquiries = sortEnquiries(enquiries)
 
   if (!summary) {
-    return <div className="admin-shell">{error ? <p className="admin-error" role="alert">{error}</p> : <p>Loading admin dashboard…</p>}</div>
+    return <div className="admin-content">{error ? <p className="admin-error" role="alert">{error}</p> : <p>Loading admin dashboard…</p>}</div>
   }
 
   const cards = [
@@ -287,8 +286,8 @@ export default function AdminPage() {
     { label: 'Archived', value: summary.archivedEnquiries, color: 'archived' },
   ]
 
-  return (
-    <main className="admin-shell">
+        return (
+    <>
       <header className="admin-header">
         <div>
           <p className="eyebrow">ADMIN</p>
@@ -298,7 +297,7 @@ export default function AdminPage() {
           <a className="admin-back-link" href="/users">Users</a>
           <a className="admin-back-link" href="/settings">Settings</a>
           <button className="admin-refresh" type="button" onClick={() => setRefreshKey((current) => current + 1)}>Refresh</button>
-          <button className="admin-logout" type="button" onClick={logout}>Sign out</button>
+          
           <a className="admin-back-link" href="/">← Back to site</a>
         </div>
       </header>
@@ -447,12 +446,14 @@ export default function AdminPage() {
           </table>
           {enquiries.length === 0 && <p className="admin-empty">No enquiries match the current filters.</p>}
         </div>
-        <div className="admin-pagination">
+                <div className="admin-pagination">
           <button type="button" onClick={() => setPage((current) => current - 1)} disabled={page === 0}>Previous</button>
           <span>Page {page + 1} of {Math.max(1, Math.ceil(totalEnquiries / pageSize))}</span>
           <button type="button" onClick={() => setPage((current) => current + 1)} disabled={(page + 1) * pageSize >= totalEnquiries}>Next</button>
         </div>
-      </section>
-    </main>
+                  </section>
+      </>
   )
 }
+
+

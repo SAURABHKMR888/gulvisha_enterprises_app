@@ -34,6 +34,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/portal/**").hasAuthority("PERMISSION_project:view")
                         .requestMatchers("/api/organizations/current").hasAuthority("PERMISSION_organization:settings")
                         .requestMatchers("/api/users/**").hasAuthority("PERMISSION_user:manage")
+                        .requestMatchers("/api/ai/**").hasAuthority("PERMISSION_ai:use")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
