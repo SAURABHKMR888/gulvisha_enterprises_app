@@ -1,0 +1,19 @@
+# Java
+backend/gulvisha-backend/target/
+
+# Node
+frontend/gulvisha-frontend/node_modules/
+frontend/gulvisha-frontend/dist/
+frontend/gulvisha-frontend/.vite/
+
+# Environment files
+.env
+.env.local
+backend/gulvisha-backend/.env
+frontend/gulvisha-frontend/.env
+
+# Editor and OS
+.idea/
+.vscode/
+*.iml
+Thumbs.db
