@@ -65,4 +65,49 @@ public class OpenAiAiProvider implements AiProvider {
             return new AiChatResponse("Error: " + e.getMessage(), model, 0);
         }
     }
+
+    @Override
+    public String defaultEmbeddingModel() {
+        return "text-embedding-3-small";
+    }
+
+    @Override
+    public AiEmbeddingResponse embed(AiEmbeddingRequest request) {
+        String embModel = request.model() != null && !request.model().isBlank()
+                ? request.model() : defaultEmbeddingModel();
+        String baseUrl = request.baseUrl() != null && !request.baseUrl().isBlank()
+                ? request.baseUrl() : "https://api.openai.com";
+        String url = baseUrl + "/v1/embeddings";
+
+        try {
+            RestTemplate restTemplate = new RestTemplate();
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            if (request.apiKey() != null && !request.apiKey().isBlank()) {
+                headers.setBearerAuth(request.apiKey());
+            }
+            Map<String, Object> body = Map.of("model", embModel, "input", request.inputs());
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+
+            Map<?, ?> response = restTemplate.postForObject(url, entity, Map.class);
+            if (response == null || response.get("data") == null) {
+                throw new IllegalStateException("OpenAI returned no embedding data for model " + embModel);
+            }
+            List<?> data = (List<?>) response.get("data");
+            List<float[]> vectors = new java.util.ArrayList<>();
+            for (Object item : data) {
+                Map<?, ?> entry = (Map<?, ?>) item;
+                List<?> values = (List<?>) entry.get("embedding");
+                float[] vector = new float[values.size()];
+                for (int i = 0; i < values.size(); i++) {
+                    vector[i] = ((Number) values.get(i)).floatValue();
+                }
+                vectors.add(vector);
+            }
+            return new AiEmbeddingResponse(vectors, embModel);
+        } catch (Exception e) {
+            log.error("OpenAI embedding failed: {}", e.getMessage());
+            throw new IllegalStateException("OpenAI embedding failed: " + e.getMessage(), e);
+        }
+    }
 }

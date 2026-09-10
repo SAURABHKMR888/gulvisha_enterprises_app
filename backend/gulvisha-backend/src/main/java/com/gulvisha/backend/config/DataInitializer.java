@@ -56,9 +56,16 @@ public class DataInitializer {
             Organization org;
             if (existingOrg.isEmpty()) {
                 org = new Organization("Gulvisha Enterprises");
+                org.setDisplayName("Gulvisha");
+                org.setSlug("gulvisha");
                 org.setIndustry("Business Services / Technology");
                 org.setEmail("hello@gulvisha.com");
                 org.setDescription("Technology, Outsourcing & AI Solutions for Growing Businesses");
+                org.setPrimaryColor("#315941");
+                org.setAccentColor("#c94f2c");
+                org.setWebsite("https://gulvisha.com");
+                org.setSiteContent("""
+                        {"heroEyebrow":"BUSINESS \u00b7 TECHNOLOGY \u00b7 AUTOMATION","heroTitle":"{brandName} \u2014 practical support for your business.","heroSubheading":"Technology, Outsourcing & AI Solutions for Growing Businesses","aboutHeading":"Practical support for <em>growing teams.</em>","aboutCapabilities":["Business process outsourcing","Custom web applications","Spring Boot & REST APIs","React & TypeScript interfaces","Data processing & validation","AI chatbot & automation workflows"],"industries":["Healthcare","Professional Services","Retail & E-commerce","Operations-heavy businesses","Startups & scaleups","Education & training"],"processHeading":"Clear steps. <em>Useful outcomes.</em>","processSteps":[{"step":"01","title":"Understand the work","description":"We map your business process, bottlenecks, and operational goals before suggesting a way forward."},{"step":"02","title":"Design the solution","description":"We structure the right mix of people, process, software, and automation to fit your reality."},{"step":"03","title":"Deliver with clarity","description":"Our work is built around practical milestones, measurable outcomes, and transparent communication."},{"step":"04","title":"Support as you grow","description":"We remain available for iteration, maintenance, optimization, and long-term operational support."}],"quoteHeading":"Let's make the work <em>lighter.</em>","quoteSubheading":"Tell us what is slowing your team down and we will come back with a practical next step.","queryDescription":"Tell us what is slowing your team down."}""");
                 organizationRepository.save(org);
             } else {
                 org = existingOrg.get();
@@ -76,7 +83,7 @@ public class DataInitializer {
                 userRepository.save(admin);
             }
 
-                        if (serviceRepository.findAllByOrganizationIdOrderByNameAsc(org.getId()).isEmpty()) {
+                        if (serviceRepository.findAllByOrganizationIdOrderByDisplayOrderAscNameAsc(org.getId()).isEmpty()) {
                 List<Service> services = List.of(
                         createService(org.getId(), "BPO & Outsourcing", "Business process outsourcing services", "Outsourcing"),
                         createService(org.getId(), "Back-Office Support", "Back-office operational support", "Outsourcing"),
@@ -220,7 +227,7 @@ public class DataInitializer {
             }
 
             // Seed default workflow: new enquiry -> create lead + add note
-            if (workflowRepository.findAllByOrganizationId(org.getId()).isEmpty()) {
+            if (workflowRepository.findAllByOrganizationIdOrderByCreatedAtDesc(org.getId()).isEmpty()) {
                 Workflow workflow = new Workflow(org.getId(), "Enquiry follow-up");
                 workflow.setDescription("Creates a lead and records a note for every new enquiry.");
                 workflow.setTriggerType("ENQUIRY_CREATED");
@@ -232,6 +239,61 @@ public class DataInitializer {
                                 "Auto-created from new enquiry", 2)
                 ));
             }
+            // ─── ABC Consulting: second demo tenant ───────────────
+            Organization abcOrg;
+            Optional<Organization> existingAbc = organizationRepository.findAll().stream()
+                    .filter(o -> "abc".equals(o.getSlug())).findFirst();
+            if (existingAbc.isEmpty()) {
+                abcOrg = new Organization("ABC Consulting LLP");
+                abcOrg.setDisplayName("ABC Consulting");
+                abcOrg.setSlug("abc");
+                abcOrg.setIndustry("Professional Services");
+                abcOrg.setEmail("info@abcconsulting.com");
+                abcOrg.setDescription("Accounting, Tax & Business Advisory for SMEs");
+                abcOrg.setPrimaryColor("#1e3a5f");
+                abcOrg.setAccentColor("#d4a843");
+                abcOrg.setWebsite("https://abcconsulting.demo");
+                abcOrg.setSiteContent("{\"heroEyebrow\":\"ACCOUNTING \\u00b7 TAX \\u00b7 ADVISORY\",\"heroTitle\":\"{brandName} \\u2014 clarity for your numbers and your decisions.\",\"heroSubheading\":\"Accounting, Tax & Business Advisory for SMEs\",\"aboutHeading\":\"Why ABC Consulting?\",\"aboutCapabilities\":[\"Statutory audit & assurance\",\"Direct & indirect tax compliance\",\"Business advisory & CFO services\",\"Company secretarial services\",\"Payroll & compliance management\",\"Management consulting\"],\"industries\":[\"Manufacturing\",\"Trading companies\",\"Startups & SMEs\",\"Professional services\",\"Real estate\",\"Healthcare practices\",\"IT & software companies\"],\"processHeading\":\"Our engagement process\",\"processSteps\":[{\"title\":\"Understand your books\",\"description\":\"We review your existing financial records, processes, and pain points.\"},{\"title\":\"Plan the engagement\",\"description\":\"We propose a clear scope, timeline, and deliverables tailored to your needs.\"},{\"title\":\"Execute with precision\",\"description\":\"Our qualified professionals deliver accurate, compliant work on schedule.\"},{\"title\":\"Advise as you grow\",\"description\":\"Ongoing advisory support to help you make better business decisions.\"}],\"quoteHeading\":\"Request a consultation\",\"quoteSubheading\":\"Let's discuss your compliance and advisory needs.\",\"quoteDescription\":\"Tell us about your business and what financial clarity you are looking for.\"}");
+                organizationRepository.save(abcOrg);
+            } else {
+                abcOrg = existingAbc.get();
+            }
+
+            // Seed ABC Consulting admin
+            if (userRepository.findAllByOrganizationIdOrderByCreatedAtDesc(abcOrg.getId()).isEmpty()) {
+                User abcAdmin = new User(
+                        abcOrg.getId(),
+                        "abc-admin",
+                        "admin@abcconsulting.com",
+                        passwordEncoder.encode("abc123"),
+                        "ABC Admin",
+                                            Role.ORGANIZATION_ADMIN
+                );
+                userRepository.save(abcAdmin);
+            }
+
+            // Seed ABC Consulting services
+            if (serviceRepository.findAllByOrganizationIdOrderByDisplayOrderAscNameAsc(abcOrg.getId()).isEmpty()) {
+                serviceRepository.saveAll(List.of(
+                        createService(abcOrg.getId(), "Statutory Audit", "Independent audit of financial statements as per statutory requirements.", "Audit & Assurance"),
+                        createService(abcOrg.getId(), "Tax Compliance", "Direct and indirect tax filing, planning, and representation.", "Tax"),
+                        createService(abcOrg.getId(), "Business Advisory", "Strategic CFO services, budgeting, and financial planning.", "Advisory"),
+                        createService(abcOrg.getId(), "Payroll Management", "End-to-end payroll processing and statutory compliance.", "Compliance"),
+                        createService(abcOrg.getId(), "Company Secretarial", "Board meetings, annual filings, and corporate governance.", "Compliance")
+                ));
+            }
+
+            // Seed ABC Consulting pipeline stages
+            if (pipelineStageRepository.findAllByOrganizationIdOrderBySortOrder(abcOrg.getId()).isEmpty()) {
+                pipelineStageRepository.saveAll(List.of(
+                        new PipelineStage(abcOrg.getId(), "New Lead", 1, true),
+                        new PipelineStage(abcOrg.getId(), "Consultation Scheduled", 2, false),
+                        new PipelineStage(abcOrg.getId(), "Proposal Sent", 3, false),
+                        new PipelineStage(abcOrg.getId(), "Engagement Signed", 4, false),
+                        new PipelineStage(abcOrg.getId(), "Declined", 5, false)
+                ));
+            }
+
         };
     }
 

@@ -1,5 +1,5 @@
-import { ReactNode } from 'react'
-import { useAuth } from './auth'
+import { ReactNode, useEffect, useState } from 'react'
+import { getAuthHeaders, useAuth } from './auth'
 
 type AdminLayoutProps = {
   children: ReactNode
@@ -14,16 +14,34 @@ const navItems = [
   { path: '/settings', label: 'Settings', icon: '⚙' },
 ]
 
+type OrgInfo = {
+  name: string
+  displayName: string | null
+  primaryColor: string | null
+  accentColor: string | null
+}
+
 export default function AdminLayout({ children, currentPath }: AdminLayoutProps) {
   const { logout, auth } = useAuth()
+  const [org, setOrg] = useState<OrgInfo | null>(null)
+
+  useEffect(() => {
+    fetch('/api/organizations/current', { headers: getAuthHeaders() })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data) => setOrg(data as OrgInfo))
+      .catch(() => setOrg(null))
+  }, [])
+
+  const brandName = org?.displayName || org?.name || 'Platform'
+  const brandInitial = brandName.charAt(0).toUpperCase()
 
   return (
     <div className="admin-shell">
       <aside className="admin-sidebar">
         <div className="admin-sidebar-brand">
-          <span className="admin-sidebar-logo">G</span>
+          <span className="admin-sidebar-logo">{brandInitial}</span>
           <div>
-            <strong>Gulvisha</strong>
+            <strong>{brandName}</strong>
             <small>Admin</small>
           </div>
         </div>

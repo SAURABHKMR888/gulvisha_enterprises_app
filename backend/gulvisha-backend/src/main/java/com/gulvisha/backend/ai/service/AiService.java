@@ -21,17 +21,20 @@ public class AiService {
     private final AiConversationRepository conversationRepository;
     private final AiMessageRepository messageRepository;
     private final AiProviderFactory providerFactory;
+    private final RagService ragService;
 
     public AiService(AiConfigurationRepository configRepository,
                     AiPromptRepository promptRepository,
                     AiConversationRepository conversationRepository,
                     AiMessageRepository messageRepository,
-                    AiProviderFactory providerFactory) {
+                    AiProviderFactory providerFactory,
+                    RagService ragService) {
         this.configRepository = configRepository;
         this.promptRepository = promptRepository;
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
         this.providerFactory = providerFactory;
+        this.ragService = ragService;
     }
 
     public AiConfigDto getConfig() {
@@ -142,6 +145,50 @@ public class AiService {
             }
         }
 
+        // RAG: knowledge-base grounding, governed by the requested mode.
+        // "general" skips retrieval; "strict" answers only from the KB;
+        // null/"auto" (default) injects context when retrieval finds relevant chunks.
+        String kbMode = dto.knowledgeBaseMode() == null || dto.knowledgeBaseMode().isBlank()
+                ? "auto" : dto.knowledgeBaseMode().trim().toLowerCase();
+
+        List<RagService.RagHit> ragHits = "general".equals(kbMode)
+                ? List.of()
+                : ragService.retrieve(orgId, dto.message(), 4);
+
+        if ("strict".equals(kbMode) && ragHits.isEmpty()) {
+            String content = "This question is not covered by the organization's knowledge base, "
+                    + "and strict knowledge-base mode is enabled. Try rephrasing the question, "
+                    + "or switch the knowledge-base toggle to Auto to answer without it.";
+            AiMessage refusedMsg = new AiMessage(conversation.getId(), "assistant", content);
+            messageRepository.save(refusedMsg);
+            return new AiChatResponseDto(
+                    conversation.getId().toString(), "assistant", content, 0,
+                    Instant.now().toString(), List.of());
+        }
+
+        boolean strictKb = "strict".equals(kbMode);
+        if (!ragHits.isEmpty()) {
+            String preamble = strictKb
+                    ? "You must answer ONLY using the knowledge base context below. "
+                      + "If the answer is not contained in the context, state that the information "
+                      + "is not available in the knowledge base. Do not use outside knowledge."
+                    : "You are answering using the organization's knowledge base. "
+                      + "Ground your answer in the context below when it is relevant; "
+                      + "if the answer is not in the context, say you don't know.";
+            StringBuilder context = new StringBuilder(preamble + "\n\n--- Knowledge base context ---\n");
+            for (int i = 0; i < ragHits.size(); i++) {
+                RagService.RagHit hit = ragHits.get(i);
+                context.append("[")
+                        .append(i + 1)
+                        .append("] (")
+                        .append(hit.documentTitle())
+                        .append(") ")
+                        .append(hit.content())
+                        .append("\n\n");
+            }
+            history.add(new AiChatRequest.ChatMessage("system", context.toString().trim()));
+        }
+
         AiProvider provider = providerFactory.getProvider(config.getProvider());
         AiChatRequest request = new AiChatRequest(
                 config.getModel(), history, config.getTemperature(), config.getMaxTokens(),
@@ -152,9 +199,14 @@ public class AiService {
         assistantMsg.setTokens(response.tokensUsed());
         messageRepository.save(assistantMsg);
 
+        List<String> sources = ragHits.stream()
+                .map(RagService.RagHit::documentTitle)
+                .distinct()
+                .toList();
+
         return new AiChatResponseDto(
                 conversation.getId().toString(), "assistant",
-                response.content(), response.tokensUsed(), Instant.now().toString());
+                response.content(), response.tokensUsed(), Instant.now().toString(), sources);
     }
 
     public List<AiConversationDto> listConversations() {

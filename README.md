@@ -18,6 +18,7 @@ Business platform foundation for Gulvisha Enterprises, with a public enquiry flo
 - Admin enquiry filtering and status updates
 - Protected internal follow-up notes for each enquiry
 - Admin search, date filtering, sorting, pagination, CSV export, bulk status updates, and archiving
+- AI assistant with multi-provider configuration (Ollama/Gemini/OpenAI), chat, prompts, and a RAG knowledge base that grounds answers in uploaded documents
 
 ## Run the backend
 

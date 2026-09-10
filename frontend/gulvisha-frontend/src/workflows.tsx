@@ -45,6 +45,8 @@ const stepActions = ['CREATE_LEAD', 'ADD_NOTE']
 const emptyCreate = { name: '', description: '', triggerType: 'ENQUIRY_CREATED', enabled: true }
 const emptyStep = { name: '', actionType: 'CREATE_LEAD', sortOrder: 1, config: '' }
 
+type WorkflowRegistry = { triggers: string[]; actions: string[] }
+
 function json<T>(response: Response | Promise<Response>): Promise<T> {
   return Promise.resolve(response).then((r) => {
     if (!r.ok) throw new Error(`Request failed (${r.status})`)
@@ -64,6 +66,9 @@ export default function WorkflowsPage() {
   const [loaded, setLoaded] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+
+  // Registry-driven trigger/action options (from /api/workflows/registry)
+  const [registry, setRegistry] = useState<WorkflowRegistry>({ triggers: workflowTriggers, actions: stepActions })
 
   const [createForm, setCreateForm] = useState(emptyCreate)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -94,6 +99,19 @@ export default function WorkflowsPage() {
   }
 
   useEffect(() => { void refresh() }, [])
+
+  useEffect(() => {
+    fetch('/api/workflows/registry', { headers: getAuthHeaders() })
+      .then((r) => {
+        if (!r.ok) throw new Error('registry unavailable')
+        return r.json() as Promise<WorkflowRegistry>
+      })
+      .then((data) => setRegistry({
+        triggers: data.triggers?.length ? data.triggers : workflowTriggers,
+        actions: data.actions?.length ? data.actions : stepActions,
+      }))
+      .catch(() => { /* fall back to static defaults */ })
+  }, [])
 
   function flash(text: string) { setMessage(text); setError('') }
   function fail(err: unknown) { setError(err instanceof Error ? err.message : 'Something went wrong'); setMessage('') }
@@ -261,7 +279,7 @@ export default function WorkflowsPage() {
                 </label>
                 <label>Trigger
                   <select value={createForm.triggerType} onChange={(e) => setCreateForm({ ...createForm, triggerType: e.target.value })}>
-                    {workflowTriggers.map((t) => <option key={t} value={t}>{t}</option>)}
+                    {registry.triggers.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </label>
                 <label className="settings-full">Description
@@ -289,7 +307,7 @@ export default function WorkflowsPage() {
                     </label>
                     <label>Trigger
                       <select value={editForm.triggerType} onChange={(e) => setEditForm({ ...editForm, triggerType: e.target.value })}>
-                        {workflowTriggers.map((t) => <option key={t} value={t}>{t}</option>)}
+                        {registry.triggers.map((t) => <option key={t} value={t}>{t}</option>)}
                       </select>
                     </label>
                     <label className="settings-full">Description
@@ -361,7 +379,7 @@ export default function WorkflowsPage() {
                                   </label>
                                   <label>Action
                                     <select value={stepForm.actionType} onChange={(e) => setStepForm({ ...stepForm, actionType: e.target.value })}>
-                                      {stepActions.map((a) => <option key={a} value={a}>{a}</option>)}
+                                      {registry.actions.map((a) => <option key={a} value={a}>{a}</option>)}
                                     </select>
                                   </label>
                                   <label>Sort order

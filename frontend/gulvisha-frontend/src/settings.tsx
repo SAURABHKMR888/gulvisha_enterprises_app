@@ -5,6 +5,10 @@ type Org = {
   id: string; name: string; description: string | null; industry: string | null
   email: string | null; phone: string | null; website: string | null; address: string | null
   timezone: string | null; currency: string | null; language: string | null
+  displayName: string | null; slug: string | null
+  logoUrl: string | null; faviconUrl: string | null
+  primaryColor: string | null; accentColor: string | null
+  siteContent: string | null
 }
 type ServiceItem = {
   id: string; name: string; description: string | null; category: string | null; pricingInfo: string | null
@@ -13,9 +17,24 @@ type Stage = { id: string; name: string; sortOrder: number; defaultStage: boolea
 type Field = {
   id: string; name: string; entityType: string; fieldType: string; options: string | null; required: boolean
 }
+type SiteContent = {
+  heroEyebrow?: string
+  heroTitle?: string
+  heroSubheading?: string
+  aboutHeading?: string
+  aboutCapabilities?: string[]
+  industries?: string[]
+  processHeading?: string
+  processSteps?: { step?: string; title?: string; description?: string }[]
+  quoteHeading?: string
+  quoteSubheading?: string
+  quoteDescription?: string
+}
 
 const tabLabels = {
   organization: 'Organization',
+  branding: 'Branding',
+  website: 'Website content',
   services: 'Services',
   pipeline: 'Pipeline stages',
   fields: 'Custom fields',
@@ -24,6 +43,14 @@ type TabKey = keyof typeof tabLabels
 
 const entityTypes = ['ENQUIRY', 'LEAD', 'CLIENT']
 const fieldTypes = ['TEXT', 'NUMBER', 'SELECT', 'DATE', 'BOOLEAN']
+
+function parseSiteContent(raw: string | null): SiteContent {
+  if (!raw) return {}
+  try { return JSON.parse(raw) as SiteContent } catch { return {} }
+}
+function serializeSiteContent(content: SiteContent): string {
+  try { return JSON.stringify(content) } catch { return '{}' }
+}
 
 function json<T>(response: Response | Promise<Response>): Promise<T> {
   return Promise.resolve(response).then((r) => {
@@ -40,6 +67,14 @@ export default function SettingsPage() {
   // Organization
   const [org, setOrg] = useState<Org | null>(null)
   const [savingOrg, setSavingOrg] = useState(false)
+
+  // Website content
+  const [siteContent, setSiteContent] = useState<SiteContent>({})
+  const [savingSite, setSavingSite] = useState(false)
+
+  // Branding (mirrors org fields for convenience, saved via saveOrg)
+  const [brandingForm, setBrandingForm] = useState({ displayName: '', slug: '', logoUrl: '', faviconUrl: '', primaryColor: '', accentColor: '' })
+  const [savingBranding, setSavingBranding] = useState(false)
 
   // Services
   const [services, setServices] = useState<ServiceItem[]>([])
@@ -61,7 +96,16 @@ export default function SettingsPage() {
         if (r.status === 401) throw new Error('Your session has expired. Please sign in again.')
         return json<Org>(r)
       })
-      .then(setOrg)
+      .then((loaded) => {
+        setOrg(loaded)
+        const sc = parseSiteContent(loaded.siteContent)
+        setSiteContent(sc)
+        setBrandingForm({
+          displayName: loaded.displayName ?? '', slug: loaded.slug ?? '',
+          logoUrl: loaded.logoUrl ?? '', faviconUrl: loaded.faviconUrl ?? '',
+          primaryColor: loaded.primaryColor ?? '', accentColor: loaded.accentColor ?? '',
+        })
+      })
       .catch((err) => setError(err instanceof Error ? err.message : 'Could not load organization settings'))
   }, [])
 
@@ -85,11 +129,61 @@ export default function SettingsPage() {
     try {
       const saved = await json<Org>(fetch('/api/organizations/current', {
         method: 'PUT', headers: { ...Object.fromEntries(getAuthHeaders()), 'Content-Type': 'application/json' },
-        body: JSON.stringify(org),
+        body: JSON.stringify({ ...org, ...brandingForm, siteContent: serializeSiteContent(siteContent) }),
       }))
       setOrg(saved)
       flash('Organization settings saved')
     } catch (err) { fail(err) } finally { setSavingOrg(false) }
+  }
+
+  async function saveBranding(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!org) return
+    setSavingBranding(true)
+    try {
+      const saved = await json<Org>(fetch('/api/organizations/current', {
+        method: 'PUT', headers: { ...Object.fromEntries(getAuthHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...org, ...brandingForm, siteContent: serializeSiteContent(siteContent) }),
+      }))
+      setOrg(saved)
+      flash('Branding saved')
+    } catch (err) { fail(err) } finally { setSavingBranding(false) }
+  }
+
+  async function saveSiteContent(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!org) return
+    setSavingSite(true)
+    try {
+      const saved = await json<Org>(fetch('/api/organizations/current', {
+        method: 'PUT', headers: { ...Object.fromEntries(getAuthHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...org, siteContent: serializeSiteContent(siteContent) }),
+      }))
+      setOrg(saved)
+      flash('Website content saved')
+    } catch (err) { fail(err) } finally { setSavingSite(false) }
+  }
+
+  function setSiteField(field: Exclude<keyof SiteContent, 'aboutCapabilities' | 'industries' | 'processSteps'>, value: string) {
+    setSiteContent((prev) => ({ ...prev, [field]: value }))
+  }
+  function setSiteList(field: 'aboutCapabilities' | 'industries', value: string) {
+    setSiteContent((prev) => ({ ...prev, [field]: value.split(',').map((s) => s.trim()).filter(Boolean) }))
+  }
+  function setSiteSteps(value: string) {
+    let steps = siteContent.processSteps ?? []
+    try {
+      const parsed = JSON.parse(value)
+      if (Array.isArray(parsed)) steps = parsed
+    } catch { /* keep old steps when parse fails */ }
+    setSiteContent((prev) => ({ ...prev, processSteps: steps }))
+  }
+  function setSiteStepsField(index: number, field: 'title' | 'description', value: string) {
+    setSiteContent((prev) => {
+      const steps = [...(prev.processSteps ?? [])]
+      steps[index] = { ...steps[index], [field]: value }
+      return { ...prev, processSteps: steps }
+    })
   }
   async function saveService(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -177,7 +271,9 @@ export default function SettingsPage() {
         <form className="portal-card" onSubmit={saveOrg}>
           <h2>Organization settings</h2>
           <div className="settings-grid">
-            <label>Name<input required value={org.name} onChange={(e) => setOrg({ ...org, name: e.target.value })} /></label>
+            <label>Legal name<input required value={org.name} onChange={(e) => setOrg({ ...org, name: e.target.value })} /></label>
+            <label>Display name<input value={brandingForm.displayName} onChange={(e) => setBrandingForm({ ...brandingForm, displayName: e.target.value })} /></label>
+            <label>Slug<input value={brandingForm.slug} onChange={(e) => setBrandingForm({ ...brandingForm, slug: e.target.value })} /></label>
             <label>Industry<input value={org.industry ?? ''} onChange={(e) => setOrg({ ...org, industry: e.target.value })} /></label>
             <label>Email<input type="email" value={org.email ?? ''} onChange={(e) => setOrg({ ...org, email: e.target.value })} /></label>
             <label>Phone<input value={org.phone ?? ''} onChange={(e) => setOrg({ ...org, phone: e.target.value })} /></label>
@@ -189,6 +285,43 @@ export default function SettingsPage() {
             <label className="settings-full">Address<input value={org.address ?? ''} onChange={(e) => setOrg({ ...org, address: e.target.value })} /></label>
           </div>
           <button className="button button-primary" type="submit" disabled={savingOrg}>{savingOrg ? 'Saving…' : 'Save settings'}</button>
+        </form>
+      )}
+
+      {tab === 'branding' && org && (
+        <form className="portal-card" onSubmit={saveBranding}>
+          <h2>Branding</h2>
+          <p className="portal-note">These values are used across the public website and the admin app header.</p>
+          <div className="settings-grid">
+            <label>Display name<input value={brandingForm.displayName} onChange={(e) => setBrandingForm({ ...brandingForm, displayName: e.target.value })} /></label>
+            <label>Primary color<input type="color" value={brandingForm.primaryColor || '#315941'} onChange={(e) => setBrandingForm({ ...brandingForm, primaryColor: e.target.value })} /></label>
+            <label>Accent color<input type="color" value={brandingForm.accentColor || '#c94f2c'} onChange={(e) => setBrandingForm({ ...brandingForm, accentColor: e.target.value })} /></label>
+            <label>Logo URL<input value={brandingForm.logoUrl} onChange={(e) => setBrandingForm({ ...brandingForm, logoUrl: e.target.value })} /></label>
+            <label>Favicon URL<input value={brandingForm.faviconUrl} onChange={(e) => setBrandingForm({ ...brandingForm, faviconUrl: e.target.value })} /></label>
+          </div>
+          <button className="button button-primary" type="submit" disabled={savingBranding}>{savingBranding ? 'Saving…' : 'Save branding'}</button>
+        </form>
+      )}
+
+      {tab === 'website' && org && (
+        <form className="portal-card" onSubmit={saveSiteContent}>
+          <h2>Website content</h2>
+          <p className="portal-note">Use {`{brandName}`} in headings — it is replaced with your display name automatically.</p>
+          <div className="settings-grid">
+            <label>Hero eyebrow<input value={siteContent.heroEyebrow ?? ''} onChange={(e) => setSiteField('heroEyebrow', e.target.value)} /></label>
+            <label className="settings-full">Hero title<input value={siteContent.heroTitle ?? ''} onChange={(e) => setSiteField('heroTitle', e.target.value)} /></label>
+            <label className="settings-full">Hero subheading<input value={siteContent.heroSubheading ?? ''} onChange={(e) => setSiteField('heroSubheading', e.target.value)} /></label>
+            <label className="settings-full">About heading<input value={siteContent.aboutHeading ?? ''} onChange={(e) => setSiteField('aboutHeading', e.target.value)} /></label>
+            <label className="settings-full">About capabilities (comma separated)<textarea rows={2} value={(siteContent.aboutCapabilities ?? []).join(', ')} onChange={(e) => setSiteList('aboutCapabilities', e.target.value)} /></label>
+            <label className="settings-full">Industries (comma separated)<textarea rows={2} value={(siteContent.industries ?? []).join(', ')} onChange={(e) => setSiteList('industries', e.target.value)} /></label>
+            <label className="settings-full">Process heading<input value={siteContent.processHeading ?? ''} onChange={(e) => setSiteField('processHeading', e.target.value)} /></label>
+            <label className="settings-full">Quote heading<input value={siteContent.quoteHeading ?? ''} onChange={(e) => setSiteField('quoteHeading', e.target.value)} /></label>
+            <label className="settings-full">Quote subheading<input value={siteContent.quoteSubheading ?? ''} onChange={(e) => setSiteField('quoteSubheading', e.target.value)} /></label>
+            <label className="settings-full">Quote description<textarea rows={2} value={siteContent.quoteDescription ?? ''} onChange={(e) => setSiteField('quoteDescription', e.target.value)} /></label>
+          </div>
+          <h3 style={{ fontSize: '1rem', margin: '0 0 8px' }}>Process steps (JSON array)</h3>
+          <textarea rows={4} style={{ width: '100%' }} value={JSON.stringify(siteContent.processSteps ?? [], null, 2)} onChange={(e) => setSiteSteps(e.target.value)} />
+          <button className="button button-primary" type="submit" disabled={savingSite}>{savingSite ? 'Saving…' : 'Save website content'}</button>
         </form>
       )}
 

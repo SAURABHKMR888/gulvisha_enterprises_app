@@ -41,6 +41,18 @@ type AiConversation = {
 type ChatMessage = {
   role: string
   content: string
+  sources?: string[]
+}
+
+type KnowledgeDoc = {
+  id: string
+  title: string
+  status: string
+  chunkCount: number
+  error: string | null
+  preview: string | null
+  createdAt: string | null
+  updatedAt: string | null
 }
 
 const emptyConfig: AiConfig = {
@@ -58,7 +70,7 @@ const emptyConfig: AiConfig = {
 const providers = ['ollama', 'gemini', 'openai']
 
 export default function AiPage() {
-  const [tab, setTab] = useState<'chat' | 'config' | 'prompts'>('chat')
+  const [tab, setTab] = useState<'chat' | 'config' | 'prompts' | 'knowledge'>('chat')
   const [config, setConfig] = useState<AiConfig>(emptyConfig)
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [providersList, setProvidersList] = useState<string[]>([])
@@ -68,6 +80,7 @@ export default function AiPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [selectedPrompt, setSelectedPrompt] = useState('')
+  const [kbMode, setKbMode] = useState(() => localStorage.getItem('gulvisha-ai-kb-mode') || 'auto')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -167,6 +180,7 @@ export default function AiPage() {
           conversationId: activeConversation?.id || '',
           message: input,
           promptId: selectedPrompt || '',
+          knowledgeBaseMode: kbMode,
         }),
       })
       if (res) {
@@ -176,7 +190,7 @@ export default function AiPage() {
           throw new Error(msg)
         }
         const data = await res.json()
-        const assistantMsg: ChatMessage = { role: 'assistant', content: data.content }
+        const assistantMsg: ChatMessage = { role: 'assistant', content: data.content, sources: data.sources || undefined }
         setMessages([...newMessages, assistantMsg])
 
         // If new conversation, reload list
@@ -262,6 +276,7 @@ export default function AiPage() {
           <button className={tab === 'chat' ? 'active' : ''} onClick={() => setTab('chat')}>Chat</button>
           <button className={tab === 'config' ? 'active' : ''} onClick={() => setTab('config')}>Configuration</button>
           <button className={tab === 'prompts' ? 'active' : ''} onClick={() => setTab('prompts')}>Prompts</button>
+          <button className={tab === 'knowledge' ? 'active' : ''} onClick={() => setTab('knowledge')}>Knowledge</button>
         </nav>
       </header>
 
@@ -286,10 +301,22 @@ export default function AiPage() {
 
             <div className="ai-chat-main">
               <div className="ai-chat-header">
-                <select value={selectedPrompt} onChange={e => setSelectedPrompt(e.target.value)} className="ai-prompt-select">
-                  <option value="">No system prompt</option>
-                  {prompts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+                <div className="ai-chat-controls">
+                  <select value={selectedPrompt} onChange={e => setSelectedPrompt(e.target.value)} className="ai-prompt-select">
+                    <option value="">No system prompt</option>
+                    {prompts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                  <select
+                    value={kbMode}
+                    onChange={e => { setKbMode(e.target.value); localStorage.setItem('gulvisha-ai-kb-mode', e.target.value) }}
+                    className="ai-prompt-select"
+                    title="How the knowledge base is used when answering"
+                  >
+                    <option value="auto">Knowledge base: Auto</option>
+                    <option value="strict">Knowledge base: Strict (only from documents)</option>
+                    <option value="general">Knowledge base: Off (general answers)</option>
+                  </select>
+                </div>
               </div>
 
               <div className="ai-messages">
@@ -298,6 +325,11 @@ export default function AiPage() {
                   <div key={i} className={`ai-message ai-message-${m.role}`}>
                     <div className="ai-message-role">{m.role}</div>
                     <div className="ai-message-content">{m.content}</div>
+                    {m.role === 'assistant' && m.sources && m.sources.length > 0 && (
+                      <div className="ai-message-sources">
+                        Sources: {m.sources.map((s, j) => <span key={j} className="ai-source-tag">{s}</span>)}
+                      </div>
+                    )}
                   </div>
                 ))}
                 {loading && <div className="ai-message ai-message-assistant"><div className="ai-message-content">Thinking...</div></div>}
@@ -362,6 +394,10 @@ export default function AiPage() {
 
         {tab === 'prompts' && (
           <PromptManager prompts={prompts} onSave={savePrompt} onDelete={deletePrompt} />
+        )}
+
+        {tab === 'knowledge' && (
+          <KnowledgeManager apiCall={apiCall} />
         )}
       </>
     </div>
@@ -434,6 +470,129 @@ function PromptManager({ prompts, onSave, onDelete }: { prompts: AiPrompt[]; onS
           <div className="portal-card-actions">
             <button className="button button-secondary" onClick={() => startEdit(p)}>Edit</button>
             <button className="button button-danger" onClick={() => onDelete(p.id)}>Delete</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function KnowledgeManager({ apiCall }: { apiCall: (url: string, options?: RequestInit) => Promise<Response | null> }) {
+  const [docs, setDocs] = useState<KnowledgeDoc[]>([])
+  const [title, setTitle] = useState('')
+  const [content, setContent] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [localError, setLocalError] = useState('')
+
+  useEffect(() => { void load() }, [])
+
+  async function load() {
+    try {
+      const res = await apiCall('/api/ai/knowledge')
+      if (res) setDocs(await res.json())
+    } catch (e: any) {
+      setLocalError(e.message)
+    }
+  }
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setContent(await file.text())
+    if (!title) setTitle(file.name.replace(/\.(txt|md|markdown)$/i, ''))
+    e.target.value = ''
+  }
+
+  async function ingest() {
+    if (!title.trim() || !content.trim() || busy) return
+    setBusy(true)
+    setLocalError('')
+    try {
+      await apiCall('/api/ai/knowledge', { method: 'POST', body: JSON.stringify({ title: title.trim(), content }) })
+      setTitle('')
+      setContent('')
+      await load()
+    } catch (e: any) {
+      setLocalError(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function remove(id: string) {
+    try {
+      await apiCall(`/api/ai/knowledge/${id}`, { method: 'DELETE' })
+      await load()
+    } catch (e: any) {
+      setLocalError(e.message)
+    }
+  }
+
+  async function reindex(id: string) {
+    setBusy(true)
+    setLocalError('')
+    try {
+      await apiCall(`/api/ai/knowledge/${id}/reindex`, { method: 'POST' })
+      await load()
+    } catch (e: any) {
+      setLocalError(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const statusColor: Record<string, string> = {
+    READY: '#16a34a',
+    FAILED: '#dc2626',
+    EMBEDDING: '#d97706',
+    PENDING: '#64748b',
+  }
+
+  return (
+    <div>
+      <div className="portal-card-header">
+        <h2>Knowledge Base</h2>
+      </div>
+      <p className="portal-note">
+        Add documents the AI can use to ground its answers (RAG). Content is chunked and embedded
+        with your configured provider; relevant chunks are injected into chat automatically.
+      </p>
+
+      {localError && <div className="alert alert-error" onClick={() => setLocalError('')}>{localError} <span>&times;</span></div>}
+
+      <div className="portal-card">
+        <h3>Add document</h3>
+        <div className="settings-grid">
+          <label>Title
+            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Return policy" />
+          </label>
+          <label>Upload .txt / .md (optional)
+            <input type="file" accept=".txt,.md,.markdown,text/plain" onChange={e => void handleFile(e)} />
+          </label>
+          <label className="full-width">Content
+            <textarea rows={6} value={content} onChange={e => setContent(e.target.value)} placeholder="Paste document text here..." />
+          </label>
+        </div>
+        <div className="portal-card-actions">
+          <button className="button button-primary" onClick={() => void ingest()} disabled={busy || !title.trim() || !content.trim()}>
+            {busy ? 'Embedding...' : 'Ingest document'}
+          </button>
+        </div>
+      </div>
+
+      {docs.length === 0 && <p className="portal-note">No documents yet</p>}
+      {docs.map(d => (
+        <div key={d.id} className="portal-card">
+          <div className="portal-card-head">
+            <h3>{d.title}</h3>
+            <span className="portal-badge" style={{ background: statusColor[d.status] || '#64748b', color: 'white' }}>{d.status}</span>
+          </div>
+          <p className="portal-note">{d.chunkCount} chunk(s) · updated {d.updatedAt ? new Date(d.updatedAt).toLocaleString() : '—'}</p>
+          {d.error && <p className="portal-note" style={{ color: '#dc2626' }}>{d.error}</p>}
+          {d.preview && <pre className="ai-prompt-content">{d.preview}</pre>}
+          <div className="portal-card-actions">
+            <button className="button button-secondary" onClick={() => void reindex(d.id)} disabled={busy}>Reindex</button>
+            <button className="button button-danger" onClick={() => void remove(d.id)}>Delete</button>
           </div>
         </div>
       ))}

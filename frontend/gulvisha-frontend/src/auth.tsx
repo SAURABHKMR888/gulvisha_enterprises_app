@@ -30,12 +30,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify({ username, password }),
     })
     if (!response.ok) throw new Error('Invalid credentials')
-    const data = await response.json()
+        const data = await response.json()
     const state: AuthState = { token: data.token, username: data.username, roles: data.roles, permissions: data.permissions || [], clientId: data.clientId ?? null }
     localStorage.setItem('gulvisha-auth', JSON.stringify(state))
     setAuth(state)
     return state
   }
+
 
   function logout() {
     localStorage.removeItem('gulvisha-auth')
@@ -56,7 +57,12 @@ export function useAuth() {
 }
 
 export function homePathFor(auth: AuthState | null): string {
+  if (auth?.roles.includes('PLATFORM_ADMIN')) return '/platform-admin'
   return auth?.roles.includes('CLIENT') ? '/portal' : '/admin'
+}
+
+export function isPlatformAdmin(auth: AuthState | null): boolean {
+  return auth?.roles.includes('PLATFORM_ADMIN') ?? false
 }
 
 export function getAuthHeaders(): Headers {

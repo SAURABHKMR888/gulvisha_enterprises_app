@@ -26,9 +26,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/health").permitAll()
+                        .requestMatchers("/api/public/**").permitAll()
                         // Public website endpoints: submit enquiries/quote requests, read services
                         .requestMatchers(HttpMethod.POST, "/api/enquiries", "/api/quote-requests").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/services").permitAll()
+                        // Platform-admin tenant management (must precede the generic /api/admin/** rules)
+                        .requestMatchers("/api/admin/organizations/**").hasAuthority("PLATFORM_ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/admin/**").hasAuthority("PERMISSION_enquiry:view")
                         .requestMatchers(HttpMethod.PATCH, "/api/admin/**").hasAuthority("PERMISSION_enquiry:update")
                         .requestMatchers("/api/portal/**").hasAuthority("PERMISSION_project:view")

@@ -4,7 +4,10 @@
   background: #e9eee7;
   font-synthesis: none;
   line-height: 1.5;
+  --brand-primary: #315941;
+  --brand-accent: #c94f2c;
 }
+
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -425,3 +428,27 @@ footer span { color: #8a9087; }
   border: 1px solid #fecaca;
 }
 .button-danger:hover { background: #fee2e2; }
+.ai-message-sources {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  opacity: 0.85;
+}
+.ai-source-tag {
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+}.ai-chat-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.ai-chat-controls .ai-prompt-select {
+  flex: 1;
+  min-width: 220px;
+}

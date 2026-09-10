@@ -25,6 +25,12 @@ public class Service {
     @Column(length = 100)
     private String category;
 
+    @Column(name = "display_order")
+    private Integer displayOrder = 0;
+
+    @Column(name = "public_visible")
+    private Boolean publicVisible = true;
+
     @Column(length = 50)
     private String status = "ACTIVE";
 
@@ -59,6 +65,10 @@ public class Service {
     public void setDescription(String description) { this.description = description; }
     public String getCategory() { return category; }
     public void setCategory(String category) { this.category = category; }
+    public Integer getDisplayOrder() { return displayOrder; }
+    public void setDisplayOrder(Integer displayOrder) { this.displayOrder = displayOrder; }
+    public Boolean getPublicVisible() { return publicVisible; }
+    public void setPublicVisible(Boolean publicVisible) { this.publicVisible = publicVisible; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public String getPricingInfo() { return pricingInfo; }

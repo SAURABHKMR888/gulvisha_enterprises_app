@@ -1,0 +1,14 @@
+
+> gulvisha-frontend@0.0.1 build
+> tsc -b && vite build
+
+[36mvite v8.2.2 [32mbuilding client environment for production...[36m[39m
+transforming...
+✓ 27 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.53 kB │ gzip:  0.33 kB
+dist/assets/index-DhrbC9mx.css   24.39 kB │ gzip:  5.61 kB
+dist/assets/index-Bpd2_hlM.js   276.51 kB │ gzip: 78.17 kB
+
+[32m✓ built in 540ms[39m

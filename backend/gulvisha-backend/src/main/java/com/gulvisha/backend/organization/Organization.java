@@ -6,6 +6,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -20,6 +22,24 @@ public class Organization {
 
     @Column(nullable = false, length = 200)
     private String name;
+
+    @Column(length = 200)
+    private String displayName;
+
+    @Column(length = 100, unique = true)
+    private String slug;
+
+    @Column(length = 500)
+    private String logoUrl;
+
+    @Column(length = 500)
+    private String faviconUrl;
+
+    @Column(length = 7)
+    private String primaryColor;
+
+    @Column(length = 7)
+    private String accentColor;
 
     @Column(length = 500)
     private String description;
@@ -48,8 +68,17 @@ public class Organization {
     @Column(length = 10)
     private String language;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "site_content", columnDefinition = "jsonb")
+    private String siteContent;
+
     @Column(length = 50)
     private String status = "ACTIVE";
+
+    // Tenant lifecycle states
+    public static final String STATUS_ONBOARDING = "ONBOARDING";
+    public static final String STATUS_ACTIVE = "ACTIVE";
+    public static final String STATUS_SUSPENDED = "SUSPENDED";
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
@@ -72,6 +101,18 @@ public class Organization {
     public UUID getId() { return id; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
+    public String getDisplayName() { return displayName; }
+    public void setDisplayName(String displayName) { this.displayName = displayName; }
+    public String getSlug() { return slug; }
+    public void setSlug(String slug) { this.slug = slug; }
+    public String getLogoUrl() { return logoUrl; }
+    public void setLogoUrl(String logoUrl) { this.logoUrl = logoUrl; }
+    public String getFaviconUrl() { return faviconUrl; }
+    public void setFaviconUrl(String faviconUrl) { this.faviconUrl = faviconUrl; }
+    public String getPrimaryColor() { return primaryColor; }
+    public void setPrimaryColor(String primaryColor) { this.primaryColor = primaryColor; }
+    public String getAccentColor() { return accentColor; }
+    public void setAccentColor(String accentColor) { this.accentColor = accentColor; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
     public String getIndustry() { return industry; }
@@ -90,6 +131,8 @@ public class Organization {
     public void setCurrency(String currency) { this.currency = currency; }
     public String getLanguage() { return language; }
     public void setLanguage(String language) { this.language = language; }
+    public String getSiteContent() { return siteContent; }
+    public void setSiteContent(String siteContent) { this.siteContent = siteContent; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public Instant getCreatedAt() { return createdAt; }

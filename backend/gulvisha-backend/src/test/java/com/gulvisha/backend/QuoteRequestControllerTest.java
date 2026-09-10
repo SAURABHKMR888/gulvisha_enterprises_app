@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -40,7 +41,7 @@ class QuoteRequestControllerTest {
 
     @Test
     void acceptsAValidQuoteRequest() throws Exception {
-        given(quoteRequestService.submit(any())).willReturn(new QuoteRequestResponse(
+        given(quoteRequestService.submit(any(), any())).willReturn(new QuoteRequestResponse(
                 UUID.fromString("3f62b7fd-7f6c-4cae-bbbb-a59d7e71bea5"),
                 Instant.parse("2026-01-01T00:00:00Z"),
                 "Thanks — your quote request has been received. We'll be in touch shortly."

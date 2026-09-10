@@ -1,0 +1,6 @@
+﻿1. Login admin: OK (roles: PLATFORM_ADMIN)
+2. List tenants: OK (2 orgs: abc, gulvisha)
+3. Create tenant xyz: OK (id=ebdc0b3e-f73d-4bc8-b1e7-f38f6c0c8237 status=ONBOARDING)
+4. Activate tenant: OK (status=ACTIVE)
+5. Public site xyz: OK (displayName=XYZ Tech color=#1a1a2e)
+6. Login xyz-admin: OK (roles: ORGANIZATION_ADMIN)

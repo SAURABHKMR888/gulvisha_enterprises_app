@@ -58,6 +58,11 @@ public class WorkflowEngine {
         return runWorkflow(organizationId, workflow, entityId);
     }
 
+    /** Registered action type keys (drives the workflow-configuration UI dropdowns). */
+    public List<String> actionTypes() {
+        return actions.keySet().stream().sorted().toList();
+    }
+
     private WorkflowExecution runWorkflow(UUID organizationId, Workflow workflow, UUID entityId) {
         WorkflowExecution execution = executionRepository.save(
                 new WorkflowExecution(organizationId, workflow.getId(), workflow.getTriggerType(), entityId));

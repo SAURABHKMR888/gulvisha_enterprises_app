@@ -53,4 +53,41 @@ public class GeminiAiProvider implements AiProvider {
             return new AiChatResponse("Error: " + e.getMessage(), model, 0);
         }
     }
+
+    @Override
+    public String defaultEmbeddingModel() {
+        return "gemini-embedding-001";
+    }
+
+    @Override
+    public AiEmbeddingResponse embed(AiEmbeddingRequest request) {
+        String embModel = request.model() != null && !request.model().isBlank()
+                ? request.model() : defaultEmbeddingModel();
+        String baseUrl = request.baseUrl() != null && !request.baseUrl().isBlank()
+                ? request.baseUrl() : "https://generativelanguage.googleapis.com";
+        String url = baseUrl + "/v1beta/models/" + embModel + ":embedContent?key="
+                + (request.apiKey() != null ? request.apiKey() : "");
+
+        List<float[]> vectors = new java.util.ArrayList<>();
+        try {
+            for (String input : request.inputs()) {
+                Map<String, Object> body = Map.of("content", Map.of("parts", List.of(Map.of("text", input))));
+                Map<?, ?> response = new RestTemplate().postForObject(url, body, Map.class);
+                if (response == null || response.get("embedding") == null) {
+                    throw new IllegalStateException("Gemini returned no embedding for model " + embModel);
+                }
+                Map<?, ?> embedding = (Map<?, ?>) response.get("embedding");
+                List<?> values = (List<?>) embedding.get("values");
+                float[] vector = new float[values.size()];
+                for (int i = 0; i < values.size(); i++) {
+                    vector[i] = ((Number) values.get(i)).floatValue();
+                }
+                vectors.add(vector);
+            }
+            return new AiEmbeddingResponse(vectors, embModel);
+        } catch (Exception e) {
+            log.error("Gemini embedding failed: {}", e.getMessage());
+            throw new IllegalStateException("Gemini embedding failed: " + e.getMessage(), e);
+        }
+    }
 }

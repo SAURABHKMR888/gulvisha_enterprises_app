@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState, ReactNode } from 'react'
 import { AuthProvider, homePathFor, useAuth } from './auth'
+import { useSiteConfig, siteDisplayName, siteInitial, fetchSiteConfig, SiteConfig } from './siteConfig'
 import LoginPage from './LoginPage'
 import AdminPage from './admin'
 import PortalPage from './portal'
@@ -8,6 +9,7 @@ import UsersPage from './users'
 import SitePage from './sitePages'
 import WorkflowsPage from './workflows'
 import AiPage from './ai'
+import PlatformAdminPage from './platform-admin'
 import AdminLayout from './admin-layout'
 
 type HealthResponse = {
@@ -29,46 +31,16 @@ type QuoteForm = {
   preferredContactMethod: string
 }
 
-const services = [
-  {
-    number: '01',
-    title: 'BPO & Outsourcing',
-    description: 'Reliable operational support for back-office work, customer service, data processing and virtual assistance.',
-  },
-  {
-    number: '02',
-    title: 'IT & Software Development',
-    description: 'Practical web applications, business software, APIs and integrations built around your operational needs.',
-  },
-  {
-    number: '03',
-    title: 'AI & Automation',
-    description: 'Thoughtful automation, AI assistants and workflow solutions designed with people in control.',
-  },
-]
-
-const serviceOptionsByCategory: Record<string, string[]> = {
-  'BPO & Outsourcing': [
-    'Back-office operations',
-    'Customer support',
-    'Data processing and validation',
-    'Virtual assistance',
-  ],
-  'IT & Software Development': [
-    'Custom web application',
-    'Business software',
-    'REST API and integrations',
-    'React and TypeScript interface',
-  ],
-  'AI & Automation': [
-    'AI chatbot',
-    'AI assistant',
-    'Workflow automation',
-    'Process automation and integrations',
-  ],
+type ServiceItem = {
+  id: string
+  name: string
+  description: string
+  category: string
 }
 
-const industries = [
+
+
+const defaultIndustries = [
   'Healthcare',
   'Professional Services',
   'Retail & E-commerce',
@@ -77,18 +49,18 @@ const industries = [
   'Education & training',
 ]
 
-const processSteps = [
+const defaultProcessSteps = [
   { step: '01', title: 'Understand the work', description: 'We map your business process, bottlenecks, and operational goals before suggesting a way forward.' },
   { step: '02', title: 'Design the solution', description: 'We structure the right mix of people, process, software, and automation to fit your reality.' },
   { step: '03', title: 'Deliver with clarity', description: 'Our work is built around practical milestones, measurable outcomes, and transparent communication.' },
   { step: '04', title: 'Support as you grow', description: 'We remain available for iteration, maintenance, optimization, and long-term operational support.' },
 ]
 
-const capabilities = [
+const defaultCapabilities = [
   'Business process outsourcing',
   'Custom web applications',
-  'Spring Boot & REST APIs',
-  'React & TypeScript interfaces',
+  'REST APIs & integrations',
+  'Modern web interfaces',
   'Data processing & validation',
   'AI chatbot & automation workflows',
 ]
@@ -113,6 +85,12 @@ function PublicSite() {
   const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
   const { auth } = useAuth()
 
+  // Read tenant slug from URL: ?tenant=abc → ABC Consulting, no param → default (first org)
+  const tenantSlug = new URLSearchParams(window.location.search).get('tenant') || undefined
+  const { config, loading: configLoading } = useSiteConfig(tenantSlug)
+  const [services, setServices] = useState<ServiceItem[]>([])
+  const [servicesLoading, setServicesLoading] = useState(true)
+
   const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/'
 
   if (currentPath && currentPath !== '/') {
@@ -120,11 +98,30 @@ function PublicSite() {
   }
 
   useEffect(() => {
+    const servicesUrl = tenantSlug ? `/api/services?slug=${encodeURIComponent(tenantSlug)}` : '/api/services'
+    fetch(servicesUrl)
+      .then((res) => (res.ok ? res.json() : { value: [] }))
+      .then((data) => {
+        const items = Array.isArray(data) ? data : (data.value || [])
+        setServices(items)
+      })
+      .catch(() => setServices([]))
+      .finally(() => setServicesLoading(false))
+  }, [tenantSlug])
+
+  useEffect(() => {
     fetch('/api/health')
       .then((response) => response.ok ? response.json() as Promise<HealthResponse> : Promise.reject())
       .then(() => setApiStatus('connected'))
       .catch(() => setApiStatus('unavailable'))
   }, [])
+
+  const serviceOptionsByCategory: Record<string, string[]> = {}
+  services.forEach((s) => {
+    const cat = s.category || 'Other'
+    if (!serviceOptionsByCategory[cat]) serviceOptionsByCategory[cat] = []
+    serviceOptionsByCategory[cat].push(s.name)
+  })
 
   function updateQuoteField(field: keyof QuoteForm, value: string) {
     setQuoteForm((currentForm) => ({ ...currentForm, [field]: value }))
@@ -137,6 +134,27 @@ function PublicSite() {
       service: '',
     }))
   }
+
+  const brandName = siteDisplayName(config)
+  const brandEmail = config?.email || 'hello@example.com'
+  const brandDescription = config?.description || 'Business solutions, thoughtfully delivered.'
+  const sc = config?.siteContent
+
+  // Replace {brandName} placeholder in content strings
+  const replaceBrand = (text: string | undefined, fallback: string) => {
+    const value = text ?? fallback
+    return value.replace(/\{brandName\}/g, brandName)
+  }
+
+  const heroEyebrow = sc?.heroEyebrow || 'BUSINESS · TECHNOLOGY · AUTOMATION'
+  const heroTitle = replaceBrand(sc?.heroTitle, `${brandName} — practical support for your business.`)
+  const aboutHeading = sc?.aboutHeading || 'Practical support for growing teams.'
+  const aboutCapabilities = sc?.aboutCapabilities?.length ? sc.aboutCapabilities : defaultCapabilities
+  const industries = sc?.industries?.length ? sc.industries : defaultIndustries
+  const processHeading = sc?.processHeading || 'Clear steps. Useful outcomes.'
+  const processSteps = sc?.processSteps?.length ? sc.processSteps : defaultProcessSteps
+  const quoteHeading = sc?.quoteHeading || "Let's make the work lighter."
+  const quoteDescription = sc?.quoteDescription || 'Tell us what is slowing your team down and we will come back with a practical next step.'
 
   async function submitQuoteRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -180,9 +198,9 @@ function PublicSite() {
         </nav>
 
         <section className="hero" id="top">
-          <p className="eyebrow">OUTSOURCING &middot; TECHNOLOGY &middot; AI</p>
-          <h1>Technology, outsourcing and AI solutions for <em>growing businesses.</em></h1>
-          <p className="hero-copy">Gulvisha Enterprises helps teams simplify operations, build practical digital systems, and automate the work that slows growth.</p>
+          <p className="eyebrow">{heroEyebrow}</p>
+          <h1 dangerouslySetInnerHTML={{ __html: heroTitle }} />
+          <p className="hero-copy">{sc?.heroSubheading ?? brandDescription}</p>
           <div className="hero-actions">
             <a className="button button-primary" href="#quote">Request a quote <span aria-hidden="true">&#8599;</span></a>
             <a className="button button-quiet" href="#services">Explore services</a>
@@ -197,21 +215,19 @@ function PublicSite() {
 
         <section className="about" id="about">
           <div className="section-heading narrow-heading">
-            <p className="eyebrow">ABOUT US</p>
-            <h2>Practical support for the work that keeps a business moving.</h2>
+            <p className="eyebrow">ABOUT</p>
+            <h2 dangerouslySetInnerHTML={{ __html: aboutHeading }} />
           </div>
           <div className="about-grid">
             <div>
-              <p>Gulvisha Enterprises supports growing businesses with outsourced operations, technology delivery, and AI-powered improvements that are built for real-world workflows.</p>
-              <p>Whether you need dependable back-office support, a custom business system, or a smarter automation layer, we focus on solutions that are useful, manageable, and aligned to your priorities.</p>
+              <p>{brandDescription}</p>
             </div>
             <div className="about-panel">
               <h3>What we bring</h3>
               <ul>
-                <li>Clear communication</li>
-                <li>Operational focus</li>
-                <li>Flexible delivery</li>
-                <li>Business-minded technology</li>
+                {aboutCapabilities.map((capability) => (
+                  <li key={capability}>{capability}</li>
+                ))}
               </ul>
             </div>
           </div>
@@ -223,10 +239,10 @@ function PublicSite() {
             <h2 id="services-heading">Services built around execution, efficiency, and growth.</h2>
           </div>
           <div className="service-grid">
-            {services.map((service) => (
-              <article className="service-card" key={service.number}>
-                <p className="service-number">{service.number}</p>
-                <h3>{service.title}</h3>
+            {services.map((service, idx) => (
+              <article className="service-card" key={service.id}>
+                <p className="service-number">{String(idx + 1).padStart(2, "0")}</p>
+                <h3>{service.name}</h3>
                 <p>{service.description}</p>
                 <span aria-hidden="true">&#8599;</span>
               </article>
@@ -268,7 +284,7 @@ function PublicSite() {
             <h2 id="capabilities-heading">Technology and operations that support real business outcomes.</h2>
           </div>
           <div className="capability-list">
-            {capabilities.map((capability) => (
+            {aboutCapabilities.map((capability) => (
               <div className="capability-pill" key={capability}>{capability}</div>
             ))}
           </div>
@@ -301,11 +317,11 @@ function PublicSite() {
             <label>How did you find us?<select value={quoteForm.source} onChange={(event) => updateQuoteField('source', event.target.value)}><option value="WEBSITE">Website</option><option>LinkedIn</option><option>Upwork</option><option>Email</option><option>Phone</option><option>Referral</option><option>Other</option></select></label>
             <label className="quote-details">Project description<textarea required rows={5} value={quoteForm.message} onChange={(event) => updateQuoteField('message', event.target.value)} /></label>
             <button className="button button-primary" disabled={submissionStatus === 'submitting'} type="submit">{submissionStatus === 'submitting' ? 'Sending request…' : 'Send request'} <span aria-hidden="true">&#8599;</span></button>
-            <p className={`form-message ${submissionStatus}`} aria-live="polite">{submissionStatus === 'success' && 'Thanks — your request is with us. We will be in touch shortly.'}{submissionStatus === 'error' && 'We could not send your request. Please try again or email hello@gulvisha.com.'}</p>
+            <p className={`form-message ${submissionStatus}`} aria-live="polite">{submissionStatus === 'success' && 'Thanks — your request is with us. We will be in touch shortly.'}{submissionStatus === 'error' && `We could not send your request. Please try again or email ${brandEmail}.`}</p>
           </form>
         </section>
 
-        <footer>&copy; {new Date().getFullYear()} Gulvisha Enterprises <span>Business solutions, thoughtfully delivered.</span></footer>
+        <footer>&copy; {new Date().getFullYear()} {brandName} <span>{brandDescription}</span></footer>
       </main>
     </>
   )
@@ -331,6 +347,9 @@ function RequireRole({ clientOnly, children }: { clientOnly?: boolean; children:
 function AdminRoute() {
   return <RequireRole><AdminLayout currentPath="/admin"><AdminPage /></AdminLayout></RequireRole>
 }
+function PlatformAdminRoute() {
+  return <RequireRole><PlatformAdminPage /></RequireRole>
+}
 
 function PortalRoute() {
   return <RequireRole clientOnly><PortalPage /></RequireRole>
@@ -354,6 +373,7 @@ function AiRoute() {
 
 function AppRouter() {
   const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/' 
+  if (currentPath === '/platform-admin') return <PlatformAdminRoute />
   if (currentPath === '/admin') return <AdminRoute />
   if (currentPath === '/portal') return <PortalRoute />
   if (currentPath === '/settings') return <SettingsRoute />
@@ -371,3 +391,4 @@ export default function App() {
     </AuthProvider>
   )
 }
+

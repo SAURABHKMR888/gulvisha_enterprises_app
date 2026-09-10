@@ -46,10 +46,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
 
                 if (username != null && permissions != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    List<SimpleGrantedAuthority> authorities = permissions.stream()
+                    List<SimpleGrantedAuthority> authorities = new java.util.ArrayList<>();
+                    permissions.stream()
                             .map(perm -> perm.startsWith("PERMISSION_") ? perm : "PERMISSION_" + perm)
                             .map(SimpleGrantedAuthority::new)
-                            .toList();
+                            .forEach(authorities::add);
+                    // Also expose the role as a raw authority (e.g. PLATFORM_ADMIN) so hasAuthority("PLATFORM_ADMIN") works
+                    Object authRole = claims.get("role");
+                    if (authRole != null && !authRole.toString().isBlank()) {
+                        authorities.add(new SimpleGrantedAuthority(authRole.toString()));
+                    }
                     SecurityContextHolder.getContext().setAuthentication(
                             new UsernamePasswordAuthenticationToken(username, null, authorities));
 

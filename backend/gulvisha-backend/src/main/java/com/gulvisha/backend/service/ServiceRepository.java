@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 public interface ServiceRepository extends JpaRepository<Service, UUID> {
-    List<Service> findAllByOrganizationIdOrderByNameAsc(UUID organizationId);
-    List<Service> findAllByOrganizationIdAndStatusOrderByNameAsc(UUID organizationId, String status);
+    List<Service> findAllByOrganizationIdOrderByDisplayOrderAscNameAsc(UUID organizationId);
+    List<Service> findAllByOrganizationIdAndPublicVisibleTrueOrderByDisplayOrderAsc(UUID organizationId);
+    List<Service> findAllByOrganizationIdAndStatusOrderByDisplayOrderAsc(UUID organizationId, String status);
 }

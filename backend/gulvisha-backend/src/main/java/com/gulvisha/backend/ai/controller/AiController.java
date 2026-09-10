@@ -2,6 +2,8 @@ package com.gulvisha.backend.ai.controller;
 
 import com.gulvisha.backend.ai.dto.*;
 import com.gulvisha.backend.ai.service.AiService;
+import com.gulvisha.backend.ai.service.RagService;
+import com.gulvisha.backend.security.UserContext;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,9 +16,11 @@ import java.util.UUID;
 public class AiController {
 
     private final AiService aiService;
+    private final RagService ragService;
 
-    public AiController(AiService aiService) {
+    public AiController(AiService aiService, RagService ragService) {
         this.aiService = aiService;
+        this.ragService = ragService;
     }
 
     @GetMapping("/providers")
@@ -79,5 +83,35 @@ public class AiController {
     public ResponseEntity<Void> deleteConversation(@PathVariable UUID id) {
         aiService.deleteConversation(id);
         return ResponseEntity.noContent().build();
+    }
+
+    // ---- Knowledge base (RAG) ----
+
+    @GetMapping("/knowledge")
+    public List<AiKnowledgeDocumentDto> listKnowledge() {
+        return ragService.listDocuments(UserContext.getOrganizationId());
+    }
+
+    @PostMapping("/knowledge")
+    public AiKnowledgeDocumentDto ingestKnowledge(@RequestBody AiKnowledgeIngestRequest request) {
+        return ragService.ingest(UserContext.getOrganizationId(), request);
+    }
+
+    @PostMapping("/knowledge/{id}/reindex")
+    public AiKnowledgeDocumentDto reindexKnowledge(@PathVariable UUID id) {
+        return ragService.reindex(UserContext.getOrganizationId(), id);
+    }
+
+    @DeleteMapping("/knowledge/{id}")
+    public ResponseEntity<Void> deleteKnowledge(@PathVariable UUID id) {
+        ragService.delete(UserContext.getOrganizationId(), id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Debug/test endpoint: returns raw retrieval hits for a query without invoking chat. */
+    @PostMapping("/knowledge/search")
+    public List<RagService.RagHit> searchKnowledge(@RequestBody Map<String, String> body) {
+        return ragService.retrieve(UserContext.getOrganizationId(),
+                body.getOrDefault("query", ""), 4);
     }
 }

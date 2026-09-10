@@ -49,4 +49,39 @@ public class OllamaAiProvider implements AiProvider {
             return new AiChatResponse("Error: " + e.getMessage(), request.model(), 0);
         }
     }
+
+    @Override
+    public String defaultEmbeddingModel() {
+        return "nomic-embed-text";
+    }
+
+    @Override
+    public AiEmbeddingResponse embed(AiEmbeddingRequest request) {
+        String embModel = request.model() != null && !request.model().isBlank()
+                ? request.model() : defaultEmbeddingModel();
+        String url = (request.baseUrl() != null && !request.baseUrl().isBlank()
+                ? request.baseUrl() : "http://localhost:11434") + "/api/embeddings";
+
+        List<float[]> vectors = new java.util.ArrayList<>();
+        try {
+            for (String input : request.inputs()) {
+                Map<String, Object> body = Map.of("model", embModel, "prompt", input);
+                Map<?, ?> response = new RestTemplate().postForObject(url, body, Map.class);
+                if (response == null || response.get("embedding") == null) {
+                    throw new IllegalStateException("Ollama returned no embedding. Is the model pulled? Try: ollama pull " + embModel);
+                }
+                List<?> values = (List<?>) response.get("embedding");
+                float[] vector = new float[values.size()];
+                for (int i = 0; i < values.size(); i++) {
+                    vector[i] = ((Number) values.get(i)).floatValue();
+                }
+                vectors.add(vector);
+            }
+            return new AiEmbeddingResponse(vectors, embModel);
+        } catch (Exception e) {
+            log.error("Ollama embedding failed: {}", e.getMessage());
+            throw new IllegalStateException("Ollama embedding failed: " + e.getMessage()
+                    + " (make sure the embedding model is pulled, e.g. ollama pull " + embModel + ")", e);
+        }
+    }
 }

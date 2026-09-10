@@ -60,6 +60,21 @@ public class WorkflowController {
         return workflowRepository.findAllByOrganizationIdOrderByCreatedAtDesc(UserContext.getOrganizationId());
     }
 
+    /**
+     * Registry of available workflow triggers and step-action types.
+     * Drives the workflow configuration UI so it stays in sync with the engine.
+     */
+    @GetMapping("/registry")
+    public WorkflowRegistry registry() {
+        return new WorkflowRegistry(
+                List.of("ENQUIRY_CREATED", "MANUAL"),
+                workflowEngine.actionTypes()
+        );
+    }
+
+    public record WorkflowRegistry(List<String> triggers, List<String> actions) {
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<Workflow> get(@PathVariable UUID id) {
         return workflowRepository.findById(id)

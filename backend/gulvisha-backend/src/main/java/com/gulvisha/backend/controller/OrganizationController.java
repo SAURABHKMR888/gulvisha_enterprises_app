@@ -37,6 +37,12 @@ public class OrganizationController {
         Organization organization = organizationRepository.findById(resolveOrganizationId())
                 .orElseThrow(() -> new IllegalStateException("No organization configured"));
         organization.setName(request.name());
+        organization.setDisplayName(request.displayName());
+        organization.setSlug(request.slug());
+        organization.setLogoUrl(request.logoUrl());
+        organization.setFaviconUrl(request.faviconUrl());
+        organization.setPrimaryColor(request.primaryColor());
+        organization.setAccentColor(request.accentColor());
         organization.setDescription(request.description());
         organization.setIndustry(request.industry());
         organization.setEmail(request.email());
@@ -46,23 +52,27 @@ public class OrganizationController {
         organization.setTimezone(request.timezone());
         organization.setCurrency(request.currency());
         organization.setLanguage(request.language());
+        organization.setSiteContent(request.siteContent());
         return organizationRepository.save(organization);
     }
 
-    /** Prefer the authenticated user's organization; fall back to the seeded default (single-tenant dev). */
+    /** Resolve the authenticated user's organization — no fallback to arbitrary orgs. */
     private UUID resolveOrganizationId() {
         UUID contextOrgId = UserContext.getOrganizationId();
         if (contextOrgId != null && organizationRepository.existsById(contextOrgId)) {
             return contextOrgId;
         }
-        return organizationRepository.findAll().stream()
-                .findFirst()
-                .map(Organization::getId)
-                .orElseThrow(() -> new IllegalStateException("No organization configured"));
+        throw new IllegalStateException("No organization configured for the current user");
     }
 
     public record OrganizationSettingsRequest(
             @NotBlank @Size(max = 200) String name,
+            @Size(max = 200) String displayName,
+            @Size(max = 100) String slug,
+            @Size(max = 500) String logoUrl,
+            @Size(max = 500) String faviconUrl,
+            @Size(max = 7) String primaryColor,
+            @Size(max = 7) String accentColor,
             @Size(max = 500) String description,
             @Size(max = 100) String industry,
             @Email @Size(max = 254) String email,
@@ -71,7 +81,8 @@ public class OrganizationController {
             @Size(max = 500) String address,
             @Size(max = 100) String timezone,
             @Size(max = 10) String currency,
-            @Size(max = 10) String language
+            @Size(max = 10) String language,
+            String siteContent
     ) {
     }
 }
