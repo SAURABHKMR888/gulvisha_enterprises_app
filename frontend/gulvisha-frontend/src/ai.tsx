@@ -55,6 +55,34 @@ type KnowledgeDoc = {
   updatedAt: string | null
 }
 
+type AiAgent = {
+  id: string
+  name: string
+  description: string | null
+  systemPrompt: string
+  allowedTools: string | null
+  provider: string | null
+  model: string | null
+  temperature: number | null
+  enabled: boolean
+  createdAt: string
+}
+
+type AiTool = { name: string; description: string; args: string }
+
+type AiAgentRun = {
+  id: string
+  agentId: string
+  agentName: string
+  input: string
+  output: string | null
+  stepsJson: string | null
+  status: string
+  error: string | null
+  createdAt: string
+  finishedAt: string | null
+}
+
 const emptyConfig: AiConfig = {
   id: '',
   organizationId: '',
@@ -70,7 +98,7 @@ const emptyConfig: AiConfig = {
 const providers = ['ollama', 'gemini', 'openai']
 
 export default function AiPage() {
-  const [tab, setTab] = useState<'chat' | 'config' | 'prompts' | 'knowledge'>('chat')
+  const [tab, setTab] = useState<'chat' | 'config' | 'prompts' | 'knowledge' | 'agents'>('chat')
   const [config, setConfig] = useState<AiConfig>(emptyConfig)
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [providersList, setProvidersList] = useState<string[]>([])
@@ -277,6 +305,7 @@ export default function AiPage() {
           <button className={tab === 'config' ? 'active' : ''} onClick={() => setTab('config')}>Configuration</button>
           <button className={tab === 'prompts' ? 'active' : ''} onClick={() => setTab('prompts')}>Prompts</button>
           <button className={tab === 'knowledge' ? 'active' : ''} onClick={() => setTab('knowledge')}>Knowledge</button>
+          <button className={tab === 'agents' ? 'active' : ''} onClick={() => setTab('agents')}>Agents</button>
         </nav>
       </header>
 
@@ -398,6 +427,10 @@ export default function AiPage() {
 
         {tab === 'knowledge' && (
           <KnowledgeManager apiCall={apiCall} />
+        )}
+
+        {tab === 'agents' && (
+          <AgentManager apiCall={apiCall} />
         )}
       </>
     </div>
@@ -596,6 +629,244 @@ function KnowledgeManager({ apiCall }: { apiCall: (url: string, options?: Reques
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+function AgentManager({ apiCall }: { apiCall: (url: string, options?: RequestInit) => Promise<Response | null> }) {
+  const [agents, setAgents] = useState<AiAgent[]>([])
+  const [tools, setTools] = useState<AiTool[]>([])
+  const [runs, setRuns] = useState<AiAgentRun[]>([])
+  const [editing, setEditing] = useState<AiAgent | null>(null)
+  const [showForm, setShowForm] = useState(false)
+  const [runTarget, setRunTarget] = useState<AiAgent | null>(null)
+  const [runInput, setRunInput] = useState('')
+  const [runResult, setRunResult] = useState<AiAgentRun | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [localError, setLocalError] = useState('')
+
+  useEffect(() => { void load() }, [])
+
+  async function load() {
+    setLocalError('')
+    try {
+      const [a, t, r] = await Promise.all([
+        apiCall('/api/ai/agents'),
+        apiCall('/api/ai/agents/tools'),
+        apiCall('/api/ai/agents/runs'),
+      ])
+      if (a) setAgents(await a.json())
+      if (t) setTools(await t.json())
+      if (r) setRuns(await r.json())
+    } catch (e: any) {
+      setLocalError(e.message)
+    }
+  }
+
+  function startNew() {
+    setEditing({
+      id: '', name: '', description: '', systemPrompt: '', allowedTools: '',
+      provider: null, model: null, temperature: null, enabled: true, createdAt: '',
+    })
+    setShowForm(true)
+  }
+
+  function toggleTool(name: string) {
+    if (!editing) return
+    const current = (editing.allowedTools || '').split(',').map(s => s.trim()).filter(Boolean)
+    const next = current.includes(name) ? current.filter(n => n !== name) : [...current, name]
+    setEditing({ ...editing, allowedTools: next.join(',') })
+  }
+
+  async function save() {
+    if (!editing || !editing.name.trim() || !editing.systemPrompt.trim()) return
+    setBusy(true)
+    setLocalError('')
+    try {
+      const isNew = !editing.id
+      const res = await apiCall(isNew ? '/api/ai/agents' : `/api/ai/agents/${editing.id}`, {
+        method: isNew ? 'POST' : 'PUT',
+        body: JSON.stringify({
+          name: editing.name.trim(),
+          description: editing.description,
+          systemPrompt: editing.systemPrompt,
+          allowedTools: editing.allowedTools,
+          enabled: editing.enabled,
+        }),
+      })
+      if (res) {
+        setShowForm(false)
+        setEditing(null)
+        await load()
+      }
+    } catch (e: any) {
+      setLocalError(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function remove(id: string) {
+    try {
+      await apiCall(`/api/ai/agents/${id}`, { method: 'DELETE' })
+      await load()
+    } catch (e: any) {
+      setLocalError(e.message)
+    }
+  }
+
+  async function toggleEnabled(agent: AiAgent) {
+    try {
+      await apiCall(`/api/ai/agents/${agent.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          name: agent.name, description: agent.description, systemPrompt: agent.systemPrompt,
+          allowedTools: agent.allowedTools, enabled: !agent.enabled,
+        }),
+      })
+      await load()
+    } catch (e: any) {
+      setLocalError(e.message)
+    }
+  }
+
+  async function executeRun() {
+    if (!runTarget || !runInput.trim()) return
+    setBusy(true)
+    setLocalError('')
+    setRunResult(null)
+    try {
+      const res = await apiCall(`/api/ai/agents/${runTarget.id}/run`, {
+        method: 'POST',
+        body: JSON.stringify({ input: runInput.trim() }),
+      })
+      if (res) {
+        setRunResult(await res.json())
+        await load()
+      }
+    } catch (e: any) {
+      setLocalError(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const runsForAgent = runTarget ? runs.filter(r => r.agentId === runTarget.id) : []
+
+  return (
+    <div>
+      <div className="portal-card-header">
+        <h2>AI Agents</h2>
+        <button className="button button-primary" onClick={startNew}>+ New Agent</button>
+      </div>
+      <p className="portal-note">
+        Agents answer questions and act through permission-controlled tools (tenant-scoped: they can
+        only see this organization's data). Available tools: {tools.map(t => t.name).join(', ') || 'none'}.
+      </p>
+
+      {localError && <div className="alert alert-error" onClick={() => setLocalError('')}>{localError} <span>&times;</span></div>}
+
+      {showForm && editing && (
+        <div className="portal-card">
+          <div className="settings-grid">
+            <label>Name
+              <input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} placeholder="e.g. Sales Assistant" />
+            </label>
+            <label className="full-width">Description
+              <input value={editing.description || ''} onChange={e => setEditing({ ...editing, description: e.target.value })} />
+            </label>
+            <label className="full-width">System prompt (tenant-specific instructions)
+              <textarea rows={6} value={editing.systemPrompt} onChange={e => setEditing({ ...editing, systemPrompt: e.target.value })} placeholder="You are the assistant for [your business]..." />
+            </label>
+            <label className="full-width">Allowed tools
+              <div>
+                {tools.map(t => {
+                  const on = (editing.allowedTools || '').split(',').map(s => s.trim()).includes(t.name)
+                  return (
+                    <label key={t.name} style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center', marginRight: '1rem' }}>
+                      <input type="checkbox" checked={on} onChange={() => toggleTool(t.name)} />
+                      {t.name}
+                    </label>
+                  )
+                })}
+              </div>
+            </label>
+            <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <input type="checkbox" checked={editing.enabled} onChange={e => setEditing({ ...editing, enabled: e.target.checked })} />
+              Enabled
+            </label>
+          </div>
+          <div className="portal-card-actions">
+            <button className="button button-primary" onClick={() => void save()} disabled={busy || !editing.name.trim() || !editing.systemPrompt.trim()}>
+              Save
+            </button>
+            <button className="button button-secondary" onClick={() => setShowForm(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {agents.length === 0 && <p className="portal-note">No agents yet</p>}
+      {agents.map(a => (
+        <div key={a.id} className="portal-card">
+          <div className="portal-card-head">
+            <h3>{a.name}</h3>
+            <span className="portal-badge" style={{ background: a.enabled ? '#16a34a' : '#64748b', color: 'white' }}>
+              {a.enabled ? 'ENABLED' : 'DISABLED'}
+            </span>
+          </div>
+          {a.description && <p className="portal-note">{a.description}</p>}
+          <pre className="ai-prompt-content">{a.systemPrompt}</pre>
+          <p className="portal-note">Tools: {a.allowedTools || '(none - Q&A only)'}</p>
+          <div className="portal-card-actions">
+            <button className="button button-primary" onClick={() => { setRunTarget(a); setRunInput(''); setRunResult(null) }}>Run</button>
+            <button className="button button-secondary" onClick={() => { setEditing(a); setShowForm(true) }}>Edit</button>
+            <button className="button button-secondary" onClick={() => void toggleEnabled(a)}>{a.enabled ? 'Disable' : 'Enable'}</button>
+            <button className="button button-danger" onClick={() => void remove(a.id)}>Delete</button>
+          </div>
+        </div>
+      ))}
+
+      {runTarget && (
+        <div className="portal-card">
+          <div className="portal-card-head">
+            <h3>Run: {runTarget.name}</h3>
+            <button className="button button-secondary" onClick={() => { setRunTarget(null); setRunResult(null) }}>&times;</button>
+          </div>
+          <div className="settings-grid">
+            <label className="full-width">Input
+              <textarea rows={3} value={runInput} onChange={e => setRunInput(e.target.value)}
+                placeholder="e.g. A customer asked about bulk data entry pricing - record them as a lead (jane@corp.com)" />
+            </label>
+          </div>
+          <div className="portal-card-actions">
+            <button className="button button-primary" onClick={() => void executeRun()} disabled={busy || !runInput.trim()}>
+              {busy ? 'Running...' : 'Run agent'}
+            </button>
+          </div>
+          {runResult && (
+            <div style={{ marginTop: '1rem' }}>
+              <p className="portal-note">Status: {runResult.status}</p>
+              <pre className="ai-prompt-content">{runResult.output || '(no answer)'}</pre>
+              {runResult.stepsJson && (
+                <details>
+                  <summary className="portal-note">Tool steps</summary>
+                  <pre className="ai-prompt-content">{runResult.stepsJson}</pre>
+                </details>
+              )}
+            </div>
+          )}
+          {runsForAgent.length > 0 && (
+            <div style={{ marginTop: '1rem' }}>
+              <h4>Recent runs</h4>
+              {runsForAgent.slice(0, 5).map(r => (
+                <p key={r.id} className="portal-note">
+                  {new Date(r.createdAt).toLocaleString()} - [{r.status}] {r.output?.slice(0, 120) || r.input.slice(0, 120)}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 # Gulvisha Platform — Continuation Summary (keep updated; read this INSTEAD of re-scanning the codebase)
 
-Last updated: 2026-09-09 · Phase 12 architecture VERIFIED with two tenants (see docs/phase12-verification.md). UI-config gaps remain (see below).
+Last updated: 2026-09-10 · **Phase 12 COMPLETE** (tenant-onboard-via-UI test passed, incl. UI config gaps closed). Phase 13 = AI Agents → plan in `docs/phase13-plan.md`.
 
 ## What this project is
 Spring Boot 3.5 (Java 21, package `com.gulvisha.backend`) + React/Vite TS frontend, PostgreSQL (`gulvisha` DB). Becoming a generic multi-tenant SaaS: one codebase, tenant data/config drives everything. Gulvisha = first tenant (seed data only).

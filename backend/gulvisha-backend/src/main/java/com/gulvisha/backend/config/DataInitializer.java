@@ -1,5 +1,7 @@
 package com.gulvisha.backend.config;
 
+import com.gulvisha.backend.agent.Agent;
+import com.gulvisha.backend.agent.AgentRepository;
 import com.gulvisha.backend.crm.Client;
 import com.gulvisha.backend.crm.ClientRepository;
 import com.gulvisha.backend.crm.Lead;
@@ -50,6 +52,7 @@ public class DataInitializer {
                                ResourceRepository resourceRepository,
                                WorkflowRepository workflowRepository,
                                WorkflowStepRepository workflowStepRepository,
+                               AgentRepository agentRepository,
                                PasswordEncoder passwordEncoder) {
         return args -> {
             Optional<Organization> existingOrg = organizationRepository.findAll().stream().findFirst();
@@ -82,6 +85,20 @@ public class DataInitializer {
                 );
                 userRepository.save(admin);
             }
+
+            if (userRepository.findByUsername("gulvisha-admin").isEmpty()) {
+                User admin = new User(
+                        org.getId(),
+                        "gulvisha-admin",
+                        "gulvisha-admin@gulvisha.com",
+                        passwordEncoder.encode("gulvisha123"),
+                        "Gulvisha Admin",
+                        Role.ORGANIZATION_ADMIN
+                );
+                userRepository.save(admin);
+            }
+
+
 
                         if (serviceRepository.findAllByOrganizationIdOrderByDisplayOrderAscNameAsc(org.getId()).isEmpty()) {
                 List<Service> services = List.of(
@@ -292,6 +309,34 @@ public class DataInitializer {
                         new PipelineStage(abcOrg.getId(), "Engagement Signed", 4, false),
                         new PipelineStage(abcOrg.getId(), "Declined", 5, false)
                 ));
+            }
+
+            // Seed one demo AI agent per tenant (Phase 13) — tenant-specific prompt, same engine
+            if (agentRepository.findByOrganizationIdOrderByNameAsc(org.getId()).isEmpty()) {
+                agentRepository.save(new Agent(org.getId(),
+                        "Gulvisha Sales Assistant",
+                        "Answers service questions and captures leads for Gulvisha Enterprises.",
+                        """
+                        You are the virtual sales assistant for Gulvisha Enterprises, a technology, \
+                        outsourcing and AI solutions company. Answer questions about BPO & Outsourcing, \
+                        Back-Office Support, Data Processing, Customer Support, Virtual Assistance, \
+                        Software/Web/API Development and AI Automation using the organization's \
+                        knowledge base. Qualify enquiries, then create a lead with the contact details \
+                        you collected. Be concise and professional.""",
+                        "search_knowledge_base,create_lead,create_task,get_services"));
+            }
+
+            if (agentRepository.findByOrganizationIdOrderByNameAsc(abcOrg.getId()).isEmpty()) {
+                agentRepository.save(new Agent(abcOrg.getId(),
+                        "ABC Client Intake Assistant",
+                        "Handles new client enquiries for ABC Consulting's audit and tax practice.",
+                        """
+                        You are the client intake assistant for ABC Consulting, an accounting firm \
+                        offering Statutory Audit, Tax Compliance, Business Advisory, Payroll Management \
+                        and Company Secretarial services. Explain these services based on the \
+                        organization's knowledge base, then create a lead for prospective clients. \
+                        Tone: formal, precise, trust-building.""",
+                        "search_knowledge_base,create_lead,create_task,get_services"));
             }
 
         };
