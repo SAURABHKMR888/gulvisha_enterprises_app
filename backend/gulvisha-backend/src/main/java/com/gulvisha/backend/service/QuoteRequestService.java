@@ -35,17 +35,20 @@ public class QuoteRequestService {
         this.workflowEngine = workflowEngine;
     }
 
-    private UUID resolveOrganizationId(String slug) {
+        private UUID resolveOrganizationId(String slug) {
         if (slug != null && !slug.isBlank()) {
             return organizationRepository.findBySlug(slug)
                     .orElseThrow(() -> new IllegalArgumentException("Unknown tenant: " + slug))
                     .getId();
         }
-        // Fallback for single-tenant mode: first org
-        return organizationRepository.findAll().stream()
-                .findFirst()
-                .map(Organization::getId)
-                .orElseThrow(() -> new IllegalStateException("No organization configured"));
+        UUID authed = UserContext.getOrganizationId();
+        if (authed != null) {
+            return authed;
+        }
+        // Public anonymous request with no tenant context: fail fast instead of
+        // silently routing to the first org in the database.
+        throw new IllegalArgumentException(
+                "No tenant specified. Pass ?tenant=<slug> or ?slug=<slug> to identify your organization.");
     }
 
     private UUID getAuthenticatedOrganizationId() {
@@ -75,8 +78,8 @@ public class QuoteRequestService {
                 "Thanks — your quote request has been received. We'll be in touch shortly.");
     }
 
-    public QuoteRequestResponse submitEnquiry(EnquiryRequest request) {
-        UUID organizationId = getAuthenticatedOrganizationId();
+        public QuoteRequestResponse submitEnquiry(EnquiryRequest request, String slug) {
+        UUID organizationId = resolveOrganizationId(slug);
         QuoteRequestEntity savedRequest = quoteRequestRepository.save(new QuoteRequestEntity(
                 organizationId,
                 request.name().trim(), request.email().trim().toLowerCase(), blankToNull(request.companyName()),

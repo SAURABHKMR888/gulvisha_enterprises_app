@@ -1,8 +1,8 @@
 package com.gulvisha.backend.project;
 
 import com.gulvisha.backend.crm.ClientRepository;
-import com.gulvisha.backend.organization.Organization;
-import com.gulvisha.backend.organization.OrganizationRepository;
+import com.gulvisha.backend.security.UserContext;
+import com.gulvisha.backend.workflow.WorkflowEngine;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -16,25 +16,26 @@ import java.util.UUID;
 public class ProjectService {
     private final ProjectRepository projectRepository;
     private final ClientRepository clientRepository;
-    private final OrganizationRepository organizationRepository;
+    private final WorkflowEngine workflowEngine;
 
     public ProjectService(ProjectRepository projectRepository,
                           ClientRepository clientRepository,
-                          OrganizationRepository organizationRepository) {
+                          WorkflowEngine workflowEngine) {
         this.projectRepository = projectRepository;
         this.clientRepository = clientRepository;
-        this.organizationRepository = organizationRepository;
+        this.workflowEngine = workflowEngine;
     }
 
-    private UUID getDefaultOrgId() {
-        return organizationRepository.findAll().stream()
-                .findFirst()
-                .map(Organization::getId)
-                .orElseThrow(() -> new IllegalStateException("No organization configured"));
+    private UUID getOrgId() {
+        UUID orgId = UserContext.getOrganizationId();
+        if (orgId == null) {
+            throw new IllegalStateException("No organization context");
+        }
+        return orgId;
     }
 
     public Page<Project> getProjects(Pageable pageable, String status, String search) {
-        UUID orgId = getDefaultOrgId();
+        UUID orgId = getOrgId();
         Specification<Project> spec = Specification.where((root, query, cb) ->
                 cb.equal(root.get("organizationId"), orgId));
 
@@ -55,7 +56,7 @@ public class ProjectService {
     public Project getProjectById(UUID id) {
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Project not found: " + id));
-        if (!project.getOrganizationId().equals(getDefaultOrgId())) {
+        if (!project.getOrganizationId().equals(getOrgId())) {
             // Tenant isolation: never reveal that a project exists in another organization
             throw new IllegalArgumentException("Project not found: " + id);
         }
@@ -63,7 +64,7 @@ public class ProjectService {
     }
 
     public Project createProject(ProjectRequest request) {
-        UUID orgId = getDefaultOrgId();
+        UUID orgId = getOrgId();
         validateClient(orgId, request.clientId());
 
         Project project = new Project(
@@ -77,7 +78,10 @@ public class ProjectService {
         if (request.status() != null && !request.status().isBlank()) {
             project.setStatus(request.status());
         }
-        return projectRepository.save(project);
+        Project saved = projectRepository.save(project);
+        // Orchestration: fire PROJECT_CREATED so tenant-configured workflows run (e.g. Create task, Update status).
+        workflowEngine.executeForTrigger(orgId, "PROJECT_CREATED", saved.getId());
+        return saved;
     }
 
     public Project updateProject(UUID id, ProjectRequest request) {

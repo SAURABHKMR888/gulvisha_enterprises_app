@@ -1,9 +1,8 @@
 package com.gulvisha.backend.resource;
 
-import com.gulvisha.backend.organization.Organization;
-import com.gulvisha.backend.organization.OrganizationRepository;
 import com.gulvisha.backend.project.Project;
 import com.gulvisha.backend.project.ProjectRepository;
+import com.gulvisha.backend.security.UserContext;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -15,25 +14,23 @@ import java.util.UUID;
 public class ResourceService {
     private final ResourceRepository resourceRepository;
     private final ProjectRepository projectRepository;
-    private final OrganizationRepository organizationRepository;
 
     public ResourceService(ResourceRepository resourceRepository,
-                           ProjectRepository projectRepository,
-                           OrganizationRepository organizationRepository) {
+                           ProjectRepository projectRepository) {
         this.resourceRepository = resourceRepository;
         this.projectRepository = projectRepository;
-        this.organizationRepository = organizationRepository;
     }
 
-    private UUID getDefaultOrgId() {
-        return organizationRepository.findAll().stream()
-                .findFirst()
-                .map(Organization::getId)
-                .orElseThrow(() -> new IllegalStateException("No organization configured"));
+    private UUID getOrgId() {
+        UUID orgId = UserContext.getOrganizationId();
+        if (orgId == null) {
+            throw new IllegalStateException("No organization context");
+        }
+        return orgId;
     }
 
     public Page<Resource> getResources(Pageable pageable, String status, String role, String search) {
-        UUID orgId = getDefaultOrgId();
+        UUID orgId = getOrgId();
         Specification<Resource> spec = Specification.where((root, query, cb) ->
                 cb.equal(root.get("organizationId"), orgId));
 
@@ -57,7 +54,7 @@ public class ResourceService {
     public Resource getResourceById(UUID id) {
         Resource resource = resourceRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Resource not found: " + id));
-        if (!resource.getOrganizationId().equals(getDefaultOrgId())) {
+        if (!resource.getOrganizationId().equals(getOrgId())) {
             // Tenant isolation: never reveal that a resource exists in another organization
             throw new IllegalArgumentException("Resource not found: " + id);
         }
@@ -65,7 +62,7 @@ public class ResourceService {
     }
 
     public Resource createResource(ResourceRequest request) {
-        UUID orgId = getDefaultOrgId();
+        UUID orgId = getOrgId();
         validateProject(orgId, request.assignedProjectId());
 
         Resource resource = new Resource(orgId, request.name(), request.role());

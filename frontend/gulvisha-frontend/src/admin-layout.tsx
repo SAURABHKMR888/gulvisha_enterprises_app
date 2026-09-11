@@ -8,6 +8,10 @@ type AdminLayoutProps = {
 
 const navItems = [
   { path: '/admin', label: 'Dashboard', icon: '◫' },
+  { path: '/clients', label: 'Clients', icon: '◉' },
+  { path: '/projects', label: 'Projects', icon: '▣' },
+  { path: '/tasks', label: 'Tasks', icon: '☑' },
+  { path: '/resources', label: 'Resources', icon: '☰' },
   { path: '/workflows', label: 'Workflows', icon: '⚡' },
   { path: '/ai', label: 'AI', icon: '✦' },
   { path: '/users', label: 'Users', icon: '☻' },

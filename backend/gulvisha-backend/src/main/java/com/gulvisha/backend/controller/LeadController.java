@@ -6,12 +6,14 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/leads")
+@PreAuthorize("hasAnyAuthority('PERMISSION_lead:view', 'PERMISSION_lead:create', 'PERMISSION_lead:update', 'PERMISSION_lead:delete')")
 public class LeadController {
 
     private final LeadService leadService;
@@ -30,6 +32,7 @@ public class LeadController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('PERMISSION_lead:create')")
     public ResponseEntity<Lead> create(@RequestBody LeadService.LeadRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(leadService.createLead(request));
     }
@@ -40,11 +43,13 @@ public class LeadController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('PERMISSION_lead:update')")
     public ResponseEntity<Lead> update(@PathVariable UUID id, @RequestBody LeadService.LeadRequest request) {
         return ResponseEntity.ok(leadService.updateLead(id, request));
     }
 
     @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAuthority('PERMISSION_lead:update')")
     public ResponseEntity<Lead> updateStatus(@PathVariable UUID id, @RequestBody StatusUpdateRequest request) {
         return ResponseEntity.ok(leadService.updateStatus(id, request.status()));
     }
@@ -55,6 +60,7 @@ public class LeadController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('PERMISSION_lead:delete')")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         leadService.deleteLead(id);
         return ResponseEntity.noContent().build();

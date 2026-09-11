@@ -67,7 +67,7 @@ public class WorkflowController {
     @GetMapping("/registry")
     public WorkflowRegistry registry() {
         return new WorkflowRegistry(
-                List.of("ENQUIRY_CREATED", "MANUAL"),
+                List.of("ENQUIRY_CREATED", "LEAD_CREATED", "PROJECT_CREATED", "TASK_CREATED", "MANUAL"),
                 workflowEngine.actionTypes()
         );
     }

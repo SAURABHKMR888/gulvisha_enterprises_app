@@ -1,9 +1,9 @@
 package com.gulvisha.backend.task;
 
-import com.gulvisha.backend.organization.Organization;
-import com.gulvisha.backend.organization.OrganizationRepository;
 import com.gulvisha.backend.project.Project;
 import com.gulvisha.backend.project.ProjectRepository;
+import com.gulvisha.backend.security.UserContext;
+import com.gulvisha.backend.workflow.WorkflowEngine;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -16,25 +16,26 @@ import java.util.UUID;
 public class TaskService {
     private final TaskRepository taskRepository;
     private final ProjectRepository projectRepository;
-    private final OrganizationRepository organizationRepository;
+    private final WorkflowEngine workflowEngine;
 
     public TaskService(TaskRepository taskRepository,
                        ProjectRepository projectRepository,
-                       OrganizationRepository organizationRepository) {
+                       WorkflowEngine workflowEngine) {
         this.taskRepository = taskRepository;
         this.projectRepository = projectRepository;
-        this.organizationRepository = organizationRepository;
+        this.workflowEngine = workflowEngine;
     }
 
-    private UUID getDefaultOrgId() {
-        return organizationRepository.findAll().stream()
-                .findFirst()
-                .map(Organization::getId)
-                .orElseThrow(() -> new IllegalStateException("No organization configured"));
+    private UUID getOrgId() {
+        UUID orgId = UserContext.getOrganizationId();
+        if (orgId == null) {
+            throw new IllegalStateException("No organization context");
+        }
+        return orgId;
     }
 
     public Page<Task> getTasks(Pageable pageable, UUID projectId, String status, String assignedTo) {
-        UUID orgId = getDefaultOrgId();
+        UUID orgId = getOrgId();
         Specification<Task> spec = Specification.where((root, query, cb) ->
                 cb.equal(root.get("organizationId"), orgId));
 
@@ -54,7 +55,7 @@ public class TaskService {
     public Task getTaskById(UUID id) {
         Task task = taskRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Task not found: " + id));
-        if (!task.getOrganizationId().equals(getDefaultOrgId())) {
+        if (!task.getOrganizationId().equals(getOrgId())) {
             // Tenant isolation: never reveal that a task exists in another organization
             throw new IllegalArgumentException("Task not found: " + id);
         }
@@ -62,12 +63,15 @@ public class TaskService {
     }
 
     public Task createTask(TaskRequest request) {
-        UUID orgId = getDefaultOrgId();
+        UUID orgId = getOrgId();
         validateProject(orgId, request.projectId());
 
         Task task = new Task(orgId, request.projectId(), request.title(), request.description());
         applyOptionalFields(task, request);
-        return taskRepository.save(task);
+        Task saved = taskRepository.save(task);
+        // Orchestration: fire TASK_CREATED so tenant-configured workflows run.
+        workflowEngine.executeForTrigger(orgId, "TASK_CREATED", saved.getId());
+        return saved;
     }
 
     public Task updateTask(UUID id, TaskRequest request) {

@@ -1,34 +1,43 @@
 package com.gulvisha.backend.crm;
 
-import com.gulvisha.backend.organization.Organization;
-import com.gulvisha.backend.organization.OrganizationRepository;
+import com.gulvisha.backend.security.UserContext;
+import com.gulvisha.backend.user.User;
+import com.gulvisha.backend.user.UserRepository;
+import com.gulvisha.backend.security.Role;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
 
 @Service
 public class ClientService {
     private final ClientRepository clientRepository;
-    private final OrganizationRepository organizationRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public ClientService(ClientRepository clientRepository,
-                         OrganizationRepository organizationRepository) {
+                         UserRepository userRepository,
+                         PasswordEncoder passwordEncoder) {
         this.clientRepository = clientRepository;
-        this.organizationRepository = organizationRepository;
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
-    private UUID getDefaultOrgId() {
-        return organizationRepository.findAll().stream()
-                .findFirst()
-                .map(Organization::getId)
-                .orElseThrow(() -> new IllegalStateException("No organization configured"));
+    private UUID getOrgId() {
+        UUID orgId = UserContext.getOrganizationId();
+        if (orgId == null) {
+            throw new IllegalStateException("No organization context");
+        }
+        return orgId;
     }
 
     public Page<Client> getClients(Pageable pageable, String search) {
-        UUID orgId = getDefaultOrgId();
+        UUID orgId = getOrgId();
         Specification<Client> spec = Specification.where((root, query, cb) ->
                 cb.equal(root.get("organizationId"), orgId));
 
@@ -47,7 +56,7 @@ public class ClientService {
     public Client getClientById(UUID id) {
         Client client = clientRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Client not found: " + id));
-        if (!client.getOrganizationId().equals(getDefaultOrgId())) {
+        if (!client.getOrganizationId().equals(getOrgId())) {
             // Tenant isolation: never reveal that a client exists in another organization
             throw new IllegalArgumentException("Client not found: " + id);
         }
@@ -56,7 +65,7 @@ public class ClientService {
 
     public Client createClient(ClientRequest request) {
         Client client = new Client(
-                getDefaultOrgId(),
+                getOrgId(),
                 request.name(),
                 request.firstName(),
                 request.lastName(),
@@ -93,6 +102,30 @@ public class ClientService {
     public void deleteClient(UUID id) {
         Client client = getClientById(id);
         clientRepository.delete(client);
+    }
+
+    /**
+     * Provisions a CLIENT-role user linked to an existing client record.
+     * The user can then sign in and access only that client's data via the portal.
+     */
+    public User createPortalUser(UUID clientId, ClientPortalUserRequest request) {
+        Client client = getClientById(clientId);
+        if (userRepository.findByUsername(request.username()).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Username already exists");
+        }
+        if (userRepository.findByEmail(request.email()).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
+        }
+        User user = new User(
+                client.getOrganizationId(),
+                request.username(),
+                request.email(),
+                passwordEncoder.encode(request.password()),
+                request.fullName(),
+                Role.CLIENT
+        );
+        user.setClientId(client.getId());
+        return userRepository.save(user);
     }
 
     public record ClientRequest(

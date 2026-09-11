@@ -39,8 +39,8 @@ type EnquiryOption = {
   receivedAt: string
 }
 
-const workflowTriggers = ['ENQUIRY_CREATED', 'MANUAL']
-const stepActions = ['CREATE_LEAD', 'ADD_NOTE']
+const workflowTriggers = ['ENQUIRY_CREATED', 'LEAD_CREATED', 'PROJECT_CREATED', 'TASK_CREATED', 'MANUAL']
+const stepActions = ['CREATE_LEAD', 'ADD_NOTE', 'CREATE_TASK', 'UPDATE_STATUS']
 
 const emptyCreate = { name: '', description: '', triggerType: 'ENQUIRY_CREATED', enabled: true }
 const emptyStep = { name: '', actionType: 'CREATE_LEAD', sortOrder: 1, config: '' }

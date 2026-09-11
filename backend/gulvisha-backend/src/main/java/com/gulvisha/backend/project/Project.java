@@ -29,7 +29,7 @@ public class Project {
     private String service;
 
     @Column(length = 50)
-    private String status = "PLANNED";
+    private String status = "PLANNING";
 
     @Column
     private LocalDate startDate;

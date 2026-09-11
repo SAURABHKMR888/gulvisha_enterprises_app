@@ -60,7 +60,7 @@ function formatDate(value: string | null | undefined): string {
 
 function formatBudget(value: number | null | undefined): string {
   if (value === null || value === undefined) return '—'
-  return new Intl.NumberFormat('en-US', { style: 'currency', maximumFractionDigits: 0 }).format(value)
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value)
 }
 
 function statusClass(status: string): string {

@@ -47,6 +47,12 @@ public enum Permission {
     TICKET_UPDATE("ticket:update"),
     TICKET_DELETE("ticket:delete"),
 
+    // Resource permissions
+    RESOURCE_VIEW("resource:view"),
+    RESOURCE_CREATE("resource:create"),
+    RESOURCE_UPDATE("resource:update"),
+    RESOURCE_DELETE("resource:delete"),
+
     // AI permissions
     AI_USE("ai:use"),
     AI_AGENT_EXECUTE("ai:agent:execute"),

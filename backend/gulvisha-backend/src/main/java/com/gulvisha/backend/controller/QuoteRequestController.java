@@ -23,10 +23,17 @@ public class QuoteRequestController {
         this.quoteRequestService = quoteRequestService;
     }
 
-    @PostMapping
+        @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public QuoteRequestResponse create(@Valid @RequestBody QuoteRequest request,
-                                       @RequestParam(required = false) String slug) {
-        return quoteRequestService.submit(request, slug);
+                                       @RequestParam(name = "tenant", required = false) String tenant,
+                                       @RequestParam(name = "slug", required = false) String slug) {
+        return quoteRequestService.submit(request, firstNonBlank(tenant, slug));
+    }
+
+    private static String firstNonBlank(String a, String b) {
+        if (a != null && !a.isBlank()) return a;
+        if (b != null && !b.isBlank()) return b;
+        return null;
     }
 }

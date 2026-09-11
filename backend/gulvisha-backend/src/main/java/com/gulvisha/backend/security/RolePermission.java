@@ -19,6 +19,7 @@ public class RolePermission {
             Permission.TASK_VIEW, Permission.TASK_CREATE, Permission.TASK_UPDATE, Permission.TASK_DELETE,
             Permission.DOCUMENT_VIEW, Permission.DOCUMENT_CREATE, Permission.DOCUMENT_UPDATE, Permission.DOCUMENT_DELETE,
             Permission.TICKET_VIEW, Permission.TICKET_CREATE, Permission.TICKET_UPDATE, Permission.TICKET_DELETE,
+            Permission.RESOURCE_VIEW, Permission.RESOURCE_CREATE, Permission.RESOURCE_UPDATE, Permission.RESOURCE_DELETE,
             Permission.AI_USE, Permission.AI_AGENT_EXECUTE,
             Permission.ORGANIZATION_SETTINGS,
             Permission.USER_MANAGE,

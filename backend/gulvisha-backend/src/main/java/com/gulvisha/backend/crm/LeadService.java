@@ -1,8 +1,8 @@
 package com.gulvisha.backend.crm;
 
-import com.gulvisha.backend.organization.Organization;
-import com.gulvisha.backend.organization.OrganizationRepository;
 import com.gulvisha.backend.pipeline.PipelineStageRepository;
+import com.gulvisha.backend.security.UserContext;
+import com.gulvisha.backend.workflow.WorkflowEngine;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -16,32 +16,33 @@ import java.util.UUID;
 public class LeadService {
     private final LeadRepository leadRepository;
     private final ClientRepository clientRepository;
-    private final OrganizationRepository organizationRepository;
     private final PipelineStageRepository pipelineStageRepository;
+    private final WorkflowEngine workflowEngine;
 
     public LeadService(LeadRepository leadRepository,
                        ClientRepository clientRepository,
-                       OrganizationRepository organizationRepository,
-                       PipelineStageRepository pipelineStageRepository) {
+                       PipelineStageRepository pipelineStageRepository,
+                       WorkflowEngine workflowEngine) {
         this.leadRepository = leadRepository;
         this.clientRepository = clientRepository;
-        this.organizationRepository = organizationRepository;
         this.pipelineStageRepository = pipelineStageRepository;
+        this.workflowEngine = workflowEngine;
     }
 
-    private UUID getDefaultOrgId() {
-        return organizationRepository.findAll().stream()
-                .findFirst()
-                .map(Organization::getId)
-                .orElseThrow(() -> new IllegalStateException("No organization configured"));
+    private UUID getOrgId() {
+        UUID orgId = UserContext.getOrganizationId();
+        if (orgId == null) {
+            throw new IllegalStateException("No organization context");
+        }
+        return orgId;
     }
 
     public List<Lead> getAllLeads() {
-        return leadRepository.findAllByOrganizationIdOrderByCreatedAtDesc(getDefaultOrgId());
+        return leadRepository.findAllByOrganizationIdOrderByCreatedAtDesc(getOrgId());
     }
 
     public Page<Lead> getLeads(Pageable pageable, String status, String search) {
-        UUID orgId = getDefaultOrgId();
+        UUID orgId = getOrgId();
         Specification<Lead> spec = Specification.where((root, query, cb) ->
                 cb.equal(root.get("organizationId"), orgId));
 
@@ -63,7 +64,7 @@ public class LeadService {
     public Lead getLeadById(UUID id) {
         Lead lead = leadRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Lead not found: " + id));
-        if (!lead.getOrganizationId().equals(getDefaultOrgId())) {
+        if (!lead.getOrganizationId().equals(getOrgId())) {
             // Tenant isolation: never reveal that a lead exists in another organization
             throw new IllegalArgumentException("Lead not found: " + id);
         }
@@ -72,7 +73,7 @@ public class LeadService {
 
     public Lead createLead(LeadRequest request) {
         Lead lead = new Lead(
-                getDefaultOrgId(),
+                getOrgId(),
                 request.firstName(),
                 request.lastName(),
                 request.email(),
@@ -85,7 +86,7 @@ public class LeadService {
 
         // Set default status
         List<com.gulvisha.backend.pipeline.PipelineStage> stages =
-                pipelineStageRepository.findAllByOrganizationIdOrderBySortOrder(getDefaultOrgId());
+                pipelineStageRepository.findAllByOrganizationIdOrderBySortOrder(getOrgId());
         if (!stages.isEmpty()) {
             lead.setStatus(stages.get(0).getName());
         }
@@ -97,6 +98,9 @@ public class LeadService {
             lead.setSourceId(request.sourceId());
             leadRepository.save(lead);
         }
+
+        // Orchestration: fire LEAD_CREATED so tenant-configured workflows run.
+        workflowEngine.executeForTrigger(getOrgId(), "LEAD_CREATED", saved.getId());
 
         return saved;
     }

@@ -10,6 +10,10 @@ import SitePage from './sitePages'
 import WorkflowsPage from './workflows'
 import AiPage from './ai'
 import PlatformAdminPage from './platform-admin'
+import ClientsPage from './clients'
+import ProjectsPage from './projects'
+import TasksPage from './tasks'
+import ResourcesPage from './resources'
 import AdminLayout from './admin-layout'
 
 type HealthResponse = {
@@ -160,8 +164,11 @@ function PublicSite() {
     event.preventDefault()
     setSubmissionStatus('submitting')
 
-    try {
-      const response = await fetch('/api/enquiries', {
+        try {
+      let url = '/api/enquiries'
+      if (tenantSlug) url += '?tenant=' + encodeURIComponent(tenantSlug)
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(quoteForm),
@@ -367,6 +374,22 @@ function WorkflowsRoute() {
   return <RequireRole><AdminLayout currentPath="/workflows"><WorkflowsPage /></AdminLayout></RequireRole>
 }
 
+function ProjectsRoute() {
+  return <RequireRole><AdminLayout currentPath="/projects"><ProjectsPage /></AdminLayout></RequireRole>
+}
+
+function ClientsRoute() {
+  return <RequireRole><AdminLayout currentPath="/clients"><ClientsPage /></AdminLayout></RequireRole>
+}
+
+function TasksRoute() {
+  return <RequireRole><AdminLayout currentPath="/tasks"><TasksPage /></AdminLayout></RequireRole>
+}
+
+function ResourcesRoute() {
+  return <RequireRole><AdminLayout currentPath="/resources"><ResourcesPage /></AdminLayout></RequireRole>
+}
+
 function AiRoute() {
   return <RequireRole><AdminLayout currentPath="/ai"><AiPage /></AdminLayout></RequireRole>
 }
@@ -379,6 +402,10 @@ function AppRouter() {
   if (currentPath === '/settings') return <SettingsRoute />
   if (currentPath === '/users') return <UsersRoute />
     if (currentPath === '/workflows') return <WorkflowsRoute />
+  if (currentPath === '/projects') return <ProjectsRoute />
+  if (currentPath === '/clients') return <ClientsRoute />
+  if (currentPath === '/tasks') return <TasksRoute />
+  if (currentPath === '/resources') return <ResourcesRoute />
   if (currentPath === '/ai') return <AiRoute />
   if (currentPath === '/login') return <LoginPage />
   return <PublicSite />
