@@ -23,6 +23,16 @@ public interface AgentTool {
     String argumentSpec();
 
     /**
+     * Platform permission required to invoke this tool, e.g. "lead:create".
+     * The orchestrator and guardrail layer deny execution when the
+     * invoking user lacks it (Phase 13 §4 user check, Phase 14 §6).
+     */
+    default String requiredPermission() { return ""; }
+
+    /** True when invoking this tool must pause for human approval first. */
+    default boolean requiresApproval() { return false; }
+
+    /**
      * Execute the tool. Args are the parsed JSON object the model produced.
      * Implementations should throw IllegalArgumentException on bad input —
      * the message is fed back to the model for self-correction.

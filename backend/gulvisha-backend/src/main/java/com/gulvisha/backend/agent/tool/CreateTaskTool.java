@@ -37,6 +37,12 @@ public class CreateTaskTool implements AgentTool {
     }
 
     @Override
+    public String requiredPermission() { return "task:create"; }
+
+    @Override
+    public boolean requiresApproval() { return true; }
+
+    @Override
     public AgentToolResult execute(UUID organizationId, Map<String, Object> args) {
         Object title = args.get("title");
         if (title == null || title.toString().isBlank()) {

@@ -1,5 +1,6 @@
 package com.gulvisha.backend;
 
+import com.gulvisha.backend.controller.HealthController;
 import com.gulvisha.backend.security.JwtService;
 import com.gulvisha.backend.service.AuthService;
 import com.gulvisha.backend.service.QuoteRequestService;
@@ -16,7 +17,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest
+@WebMvcTest(controllers = HealthController.class)
 @AutoConfigureMockMvc(addFilters = false)
 class HealthControllerTest {
 
@@ -85,6 +86,37 @@ class HealthControllerTest {
 
     @MockitoBean
     private com.gulvisha.backend.user.UserService userService;
+
+    // --- Phase 13/14 AI beans required by the @WebMvcTest slice ---
+
+    @MockitoBean
+    private com.gulvisha.backend.agent.AgentService agentService;
+
+    @MockitoBean
+    private com.gulvisha.backend.agent.AgentToolRegistry agentToolRegistry;
+
+    @MockitoBean
+    private com.gulvisha.backend.agent.guardrail.AgentGuardrailService agentGuardrailService;
+
+    @MockitoBean
+    private com.gulvisha.backend.agent.guardrail.AgentApprovalService agentApprovalService;
+
+    @MockitoBean
+    private com.gulvisha.backend.agent.guardrail.AgentResumeService agentResumeService;
+
+    @MockitoBean
+    private com.gulvisha.backend.agent.guardrail.OrchestrationResumeBridge orchestrationResumeBridge;
+
+    @MockitoBean
+    private com.gulvisha.backend.agent.orchestration.OrchestrationService orchestrationService;
+
+    // --- Phase 12 AI beans required by the @WebMvcTest slice ---
+
+    @MockitoBean
+    private com.gulvisha.backend.ai.service.AiService aiService;
+
+    @MockitoBean
+    private com.gulvisha.backend.ai.service.RagService ragService;
 
     @Test
     void returnsApplicationHealth() throws Exception {

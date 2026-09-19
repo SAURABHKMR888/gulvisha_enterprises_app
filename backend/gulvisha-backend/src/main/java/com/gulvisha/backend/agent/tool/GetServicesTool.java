@@ -33,6 +33,9 @@ public class GetServicesTool implements AgentTool {
     public String argumentSpec() { return "{}"; }
 
     @Override
+    public String requiredPermission() { return "project:view"; }
+
+    @Override
     public AgentToolResult execute(UUID organizationId, Map<String, Object> args) {
         var services = serviceRepository.findAllByOrganizationIdOrderByDisplayOrderAscNameAsc(organizationId);
         if (services.isEmpty()) {

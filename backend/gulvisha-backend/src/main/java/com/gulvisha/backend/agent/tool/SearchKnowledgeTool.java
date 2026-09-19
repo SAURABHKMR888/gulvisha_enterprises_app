@@ -32,6 +32,9 @@ public class SearchKnowledgeTool implements AgentTool {
     public String argumentSpec() { return "{ \"query\": \"text to search for\" }"; }
 
     @Override
+    public String requiredPermission() { return "ai:use"; }
+
+    @Override
     public AgentToolResult execute(UUID organizationId, Map<String, Object> args) {
         Object query = args.get("query");
         if (query == null || query.toString().isBlank()) {

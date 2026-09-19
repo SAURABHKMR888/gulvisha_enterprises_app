@@ -42,6 +42,12 @@ public class CreateLeadTool implements AgentTool {
     }
 
     @Override
+    public String requiredPermission() { return "lead:create"; }
+
+    @Override
+    public boolean requiresApproval() { return true; }
+
+    @Override
     public AgentToolResult execute(UUID organizationId, Map<String, Object> args) {
         Object firstName = args.get("firstName");
         Object email = args.get("email");

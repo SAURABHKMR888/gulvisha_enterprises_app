@@ -34,7 +34,19 @@ public class AgentRun {
     @Column(length = 8000)
     private String stepsJson;
 
-    /** RUNNING | COMPLETED | FAILED | MAX_ITERATIONS */
+    @Column(length = 100)
+    private String username;
+
+    @Column(length = 100)
+    private String model;
+
+    @Column
+    private Integer tokensUsed = 0;
+
+    @Column
+    private Long estimatedCostMicros = 0L;
+
+    /** RUNNING | COMPLETED | FAILED | MAX_ITERATIONS | WAITING_APPROVAL | REJECTED */
     @Column(nullable = false, length = 20)
     private String status = "RUNNING";
 
@@ -70,6 +82,14 @@ public class AgentRun {
     public void setStatus(String status) { this.status = status; }
     public String getError() { return error; }
     public void setError(String error) { this.error = error; }
+    public String getUsername() { return username; }
+    public void setUsername(String username) { this.username = username; }
+    public String getModel() { return model; }
+    public void setModel(String model) { this.model = model; }
+    public Integer getTokensUsed() { return tokensUsed; }
+    public void setTokensUsed(Integer tokensUsed) { this.tokensUsed = tokensUsed; }
+    public Long getEstimatedCostMicros() { return estimatedCostMicros; }
+    public void setEstimatedCostMicros(Long v) { this.estimatedCostMicros = v; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getFinishedAt() { return finishedAt; }
     public void setFinishedAt(Instant finishedAt) { this.finishedAt = finishedAt; }

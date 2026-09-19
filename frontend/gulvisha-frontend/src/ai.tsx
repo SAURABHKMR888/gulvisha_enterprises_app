@@ -98,7 +98,7 @@ const emptyConfig: AiConfig = {
 const providers = ['ollama', 'gemini', 'openai']
 
 export default function AiPage() {
-  const [tab, setTab] = useState<'chat' | 'config' | 'prompts' | 'knowledge' | 'agents'>('chat')
+  const [tab, setTab] = useState<'chat' | 'config' | 'prompts' | 'knowledge' | 'agents' | 'workflows' | 'approvals'>('chat')
   const [config, setConfig] = useState<AiConfig>(emptyConfig)
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [providersList, setProvidersList] = useState<string[]>([])
@@ -306,6 +306,8 @@ export default function AiPage() {
           <button className={tab === 'prompts' ? 'active' : ''} onClick={() => setTab('prompts')}>Prompts</button>
           <button className={tab === 'knowledge' ? 'active' : ''} onClick={() => setTab('knowledge')}>Knowledge</button>
           <button className={tab === 'agents' ? 'active' : ''} onClick={() => setTab('agents')}>Agents</button>
+          <button className={tab === 'workflows' ? 'active' : ''} onClick={() => setTab('workflows')}>Workflows</button>
+          <button className={tab === 'approvals' ? 'active' : ''} onClick={() => setTab('approvals')}>Approvals</button>
         </nav>
       </header>
 
@@ -431,6 +433,14 @@ export default function AiPage() {
 
         {tab === 'agents' && (
           <AgentManager apiCall={apiCall} />
+        )}
+
+        {tab === 'workflows' && (
+          <OrchestrationManager apiCall={apiCall} />
+        )}
+
+        {tab === 'approvals' && (
+          <ApprovalQueue apiCall={apiCall} />
         )}
       </>
     </div>
@@ -631,6 +641,38 @@ function KnowledgeManager({ apiCall }: { apiCall: (url: string, options?: Reques
       ))}
     </div>
   )
+}
+
+type AgentApproval = {
+  id: string
+  agentName: string
+  toolName: string
+  argsJson: string | null
+  requestedBy: string | null
+  status: string
+  createdAt: string
+}
+
+type AiOrchestration = {
+  id: string
+  name: string
+  description: string | null
+  supervisorAgentId: string | null
+  stepsJson: string
+  executionMode: string
+  maxSteps: number
+  maxRetriesPerStep: number
+  defaultTimeoutSeconds: number
+  enabled: boolean
+}
+
+type OrchestrationRun = {
+  id: string
+  status: string
+  output: string | null
+  error: string | null
+  stepsJson: string | null
+  totalTokens: number
 }
 
 function AgentManager({ apiCall }: { apiCall: (url: string, options?: RequestInit) => Promise<Response | null> }) {
@@ -863,6 +905,163 @@ function AgentManager({ apiCall }: { apiCall: (url: string, options?: RequestIni
                   {new Date(r.createdAt).toLocaleString()} - [{r.status}] {r.output?.slice(0, 120) || r.input.slice(0, 120)}
                 </p>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ApprovalQueue({ apiCall }: { apiCall: (url: string, options?: RequestInit) => Promise<Response | null> }) {
+  const [items, setItems] = useState<AgentApproval[]>([])
+  const [usage, setUsage] = useState<{ tokensUsed: number; costMicros: number } | null>(null)
+
+  useEffect(() => { void load() }, [])
+
+  async function load() {
+    const [a, u] = await Promise.all([
+      apiCall('/api/ai/approvals?status=PENDING'),
+      apiCall('/api/ai/approvals/usage'),
+    ])
+    if (a) setItems(await a.json())
+    if (u) setUsage(await u.json())
+  }
+
+  async function decide(id: string, approve: boolean) {
+    await apiCall(`/api/ai/approvals/${id}/${approve ? 'approve' : 'reject'}`, { method: 'POST' })
+    await load()
+  }
+
+  return (
+    <div>
+      {usage && <p className="portal-note">Tenant usage: {usage.tokensUsed} tokens</p>}
+      <div className="portal-card-actions">
+        <button className="button button-secondary" onClick={() => void load()}>Refresh</button>
+      </div>
+      {items.length === 0 && <p className="portal-note">No pending approvals</p>}
+      {items.map(a => (
+        <div key={a.id} className="portal-card">
+          <h3>{a.toolName} — {a.agentName}</h3>
+          <p className="portal-note">Requested by {a.requestedBy || 'agent'}</p>
+          {a.argsJson && <pre className="ai-prompt-content">{a.argsJson}</pre>}
+          <div className="portal-card-actions">
+            <button className="button button-primary" onClick={() => void decide(a.id, true)}>Approve</button>
+            <button className="button button-danger" onClick={() => void decide(a.id, false)}>Reject</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function OrchestrationManager({ apiCall }: { apiCall: (url: string, options?: RequestInit) => Promise<Response | null> }) {
+  const [items, setItems] = useState<AiOrchestration[]>([])
+  const [agents, setAgents] = useState<AiAgent[]>([])
+  const [busy, setBusy] = useState(false)
+  const [runInput, setRunInput] = useState('')
+  const [runTarget, setRunTarget] = useState<AiOrchestration | null>(null)
+  const [runResult, setRunResult] = useState<OrchestrationRun | null>(null)
+  const [formOpen, setFormOpen] = useState(false)
+  const [editing, setEditing] = useState<Partial<AiOrchestration> & { stepsText?: string }>({})
+
+  useEffect(() => { void load() }, [])
+
+  async function load() {
+    const [o, a] = await Promise.all([
+      apiCall('/api/ai/orchestrations'),
+      apiCall('/api/ai/agents'),
+    ])
+    if (o) setItems(await o.json())
+    if (a) setAgents(await a.json())
+  }
+
+  async function save() {
+    setBusy(true)
+    try {
+      const payload = {
+        name: editing.name,
+        description: editing.description,
+        supervisorAgentId: editing.supervisorAgentId || null,
+        stepsJson: editing.stepsText || '[]',
+        executionMode: editing.executionMode || 'SEQUENTIAL',
+        maxSteps: editing.maxSteps ?? 10,
+        maxRetriesPerStep: editing.maxRetriesPerStep ?? 1,
+        defaultTimeoutSeconds: editing.defaultTimeoutSeconds ?? 180,
+        enabled: editing.enabled ?? true,
+      }
+      const url = editing.id ? `/api/ai/orchestrations/${editing.id}` : '/api/ai/orchestrations'
+      const res = await apiCall(url, { method: editing.id ? 'PUT' : 'POST', body: JSON.stringify(payload) })
+      if (res?.ok) { setFormOpen(false); setEditing({}); await load() }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function executeRun() {
+    if (!runTarget) return
+    setBusy(true)
+    try {
+      const res = await apiCall(`/api/ai/orchestrations/${runTarget.id}/run`, {
+        method: 'POST', body: JSON.stringify({ input: runInput }),
+      })
+      if (res?.ok) setRunResult(await res.json())
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div>
+      <div className="portal-card-actions">
+        <button className="button button-primary" onClick={() => { setEditing({ executionMode: 'SEQUENTIAL', maxSteps: 10, maxRetriesPerStep: 1, defaultTimeoutSeconds: 180, enabled: true, stepsText: '[]' }); setFormOpen(true) }}>
+          New workflow
+        </button>
+        <button className="button button-secondary" onClick={() => void load()}>Refresh</button>
+      </div>
+      {formOpen && (
+        <div className="portal-card">
+          <h3>{editing.id ? 'Edit workflow' : 'New workflow'}</h3>
+          <div className="settings-grid">
+            <label>Name<input value={editing.name || ''} onChange={e => setEditing({ ...editing, name: e.target.value })} /></label>
+            <label className="full-width">Steps JSON
+              <textarea rows={4} value={editing.stepsText || '[]'} onChange={e => setEditing({ ...editing, stepsText: e.target.value })} />
+            </label>
+            <label className="full-width">Agents
+              <span className="portal-note">{agents.map(a => `${a.name}=${a.id}`).join(' | ') || '(none)'}</span>
+            </label>
+          </div>
+          <div className="portal-card-actions">
+            <button className="button button-primary" onClick={() => void save()} disabled={busy || !editing.name}>Save</button>
+            <button className="button button-secondary" onClick={() => setFormOpen(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {items.map(o => (
+        <div key={o.id} className="portal-card">
+          <div className="portal-card-head">
+            <h3>{o.name}</h3>
+          </div>
+          <p className="portal-note">{o.description} — mode {o.executionMode}</p>
+          <div className="portal-card-actions">
+            <button className="button button-primary" onClick={() => { setRunTarget(o); setRunInput(''); setRunResult(null) }}>Run</button>
+            <button className="button button-secondary" onClick={() => { setEditing({ ...o, stepsText: o.stepsJson }); setFormOpen(true) }}>Edit</button>
+          </div>
+        </div>
+      ))}
+      {runTarget && (
+        <div className="portal-card">
+          <h3>Run: {runTarget.name}</h3>
+          <textarea rows={3} value={runInput} onChange={e => setRunInput(e.target.value)} />
+          <div className="portal-card-actions">
+            <button className="button button-primary" onClick={() => void executeRun()} disabled={busy || !runInput.trim()}>
+              {busy ? 'Running...' : 'Run workflow'}
+            </button>
+          </div>
+          {runResult && (
+            <div style={{ marginTop: '1rem' }}>
+              <p className="portal-note">Status: {runResult.status} — tokens {runResult.totalTokens}</p>
+              <pre className="ai-prompt-content">{runResult.output || runResult.error || '(no output)'}</pre>
             </div>
           )}
         </div>
